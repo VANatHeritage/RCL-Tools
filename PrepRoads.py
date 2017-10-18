@@ -108,7 +108,7 @@ def PrepRoadsVA(inRCL):
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
-# Use section below to run a function (or set of functions) using a free-standing script
+# Use the section below to enable a function (or set of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
    # Set up your variables here
    inRCL = r'C:\Testing\RCL_Test.gdb\RCL2017Q3_Subset'
