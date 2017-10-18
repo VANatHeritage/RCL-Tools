@@ -15,7 +15,9 @@ The instructions here assume that your Network Dataset, "RCL_ND", has already be
 
 
 LESSONS LEARNED: 
-The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS yielded better results in some sections, but DETAILED_POLYS yielded better results in others. This was when creating polygons ONLY. When the Service Area Layer was set to include both lines and polygons, polygon delineation improved (all other specifications held constant). Including lines takes considerably more time, but appears to be worth it for superior results in the polygons as well as leaving other options open for further analysis.
+The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS yielded better results in some sections, but DETAILED_POLYS yielded better results in others.  DETAILED_POLYS left some truly bizarre service holes in places. 
+
+When the Service Area Layer was set to include both lines and polygons, polygon delineation improved, at least for SIMPLE_POLYS (all other specifications held constant). Including lines takes considerably more time, but appears to be worth it for superior results in the polygons as well as leaving other options open for further analysis. 
 
 ****************************************************************************************
 
@@ -32,7 +34,7 @@ The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS
    - Hierarchy: [n/a]
    - Line Generation Options:
       - Line Type: TRUE_LINES
-      - Overlap Lines: Unchecked
+      - Overlap Lines: [depends; do overlap if you want to know how many of your targets are within a certain distance.]
       - Split Lines: Checked
       - Include Network Source Fields: [your choice]
    - Polygon Generation Options:
@@ -54,7 +56,7 @@ The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS
    - Search Criteria:
       - Roads, Shape
    - Find Closest: Checked
-   - Append to Existing Locations: [Your choice; depends on situation]
+   - Append to Existing Locations: [Your choice; depends on situation. If you want to keep reusing the same Service Analysis Layer with different targets, do NOT append.]
    - Snap to Network: Unchecked
    - Exclude Restricted Portions: Unchecked
    - Search Query: [n/a]
