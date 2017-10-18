@@ -34,7 +34,7 @@ When the Service Area Layer was set to include both lines and polygons, polygon 
    - Hierarchy: [n/a]
    - Line Generation Options:
       - Line Type: TRUE_LINES
-      - Overlap Lines: [depends; do overlap if you want to know how many of your targets are within a certain distance.]
+      - Overlap Lines: [depends; do overlap if you want to know how many of your targets are within a certain distance, but realize this may take a LOT longer than simple lines.]
       - Split Lines: Checked
       - Include Network Source Fields: [your choice]
    - Polygon Generation Options:
