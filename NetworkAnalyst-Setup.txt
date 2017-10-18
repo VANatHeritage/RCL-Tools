@@ -1,0 +1,60 @@
+NETWORK ANALYST PROCEDURES
+How to set up a Network Dataset for Virginia roads
+
+****************************************************************************************
+
+IMPORTANT NOTE: A Network Dataset is created using a wizard within ArcMap. This process can NOT be accomplished with arcpy scripting. All the steps below starting from #7 must be done manually following the sequence dictated by the New Network Dataset wizard.
+
+Once you have successfully set up your Network Dataset using the steps below, you can do a lot with it either manually using the Network Analyst toolbar, or by running individual tools in the Network Analyst toolbox. The tools in the toolbox can also be accessed via arcpy scripting, so automation is possible once you have set up the initial network.
+
+****************************************************************************************
+1. Open ArcMap. Make sure you have the Network Analyst extension loaded, and add the Network Analyst toolbar.
+
+2. Add your roads dataset to the map.
+
+3. If you haven't already, create and populate a "TravTime" field. The values in this field should represent the time it takes, in minutes, to traverse 1 meter along the road segment. (This can be done by first prepping the roads data with the script "PrepRoads.py".
+
+4. Create a new file geodatabase named "RCL_Network.gdb".
+
+5. Within the new geodatabase, create a feature dataset called "RCL". Use the standard Virginia Lambert coordinate system for this.
+
+6. Import your roads dataset into the "RCL" feature dataset, and name it "Roads". (This can take awhile depending on the size of your import.)
+
+7. Right-click on your feature dataset, and create a new Network Dataset using the wizard. Use the following options:
+   - Name: RCL_ND
+   - Version: 10.1
+   - Feature class to participate: Roads
+   - Model turns: No
+   - Connectivity: Leave default
+   - Model elevation: None
+   - When you get to the window saying "Specify the attributes for the network dataset", got to step 8.
+   
+8. Click the "Add" button to create a new attribute as follows:
+   - Name: DriveTime
+   - Usage Type: Cost
+   - Units: Minutes
+   - Data Type: Double
+   - Restriction Usage: [n/a/]
+   Click OK.
+   
+9. With the new "DriveTime" attribute selected, click the "Evaluators" button. You will see two entries under the "Source Values" tab. For each, select "Field" as the type, then click on the "Evaluator Properties" button on the right. In the popup window, choose Python as the parser, and put a formula in the "Value = " box, then click OK. Use this formula: 
+   !TravTime! * !Shape_Length!
+   
+10. After successfully setting up your evaluators, click OK to return to the attributes window, then click Next. 
+
+11. In the "Travel Mode" window, set the following:
+   - Travel Mode: DriveAllRoads
+   - Impedance: DriveTime (Minutes)
+   - Time Attribute: DriveTime (Minutes)
+   - Distance Attribute: Length (Meters)
+   Leave everything else with defaults, then click Next.
+   
+12. In the next window, select "No" (do NOT establish driving directions). Click Next.
+
+13. In the next window, check the box next to "Build Service Area Index".
+
+14. Click Next, then Finish.
+
+15. When the "New Network Dataset" window pops up asking if you would like to build it, click "Yes". This may take awhile depending on the size of your dataset. Don't try to do anything else in ArcMap while this is happening - there will not be any visual cues other than the spinning circle of death.
+
+16. When the "Adding Network Layer" window pops up, asking if you want to add all the participating feature classes to your map, click "Yes". This completes the process of setting up your network.
