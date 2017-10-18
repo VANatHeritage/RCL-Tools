@@ -1,0 +1,65 @@
+NETWORK ANALYST PROCEDURES
+How to conduct a drive time analysis (= "Service Area Analysis") with Virginia roads and targets
+
+Prepared by Kirsten Hazler
+Last Edit: 2017-10-18
+
+****************************************************************************************
+
+IMPORTANT NOTE: 
+A Network Dataset is created using a wizard within ArcMap. This process can NOT be accomplished with arcpy scripting. 
+
+Once you have successfully set up your Network Dataset, you can run analyses either manually using the Network Analyst toolbar, or by running individual tools in the Network Analyst toolbox. The tools in the toolbox can also be accessed via arcpy scripting, so automation is possible once you have set up the initial network.
+
+The instructions here assume that your Network Dataset, "RCL_ND", has already been set up using the steps outlined in the document "NetworkAnalyst-Setup.txt". I will also assume you have a point feature class representing the targets (e.g., boat ramps) to which you want to determine drive times.
+
+
+LESSONS LEARNED: 
+The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS yielded better results in some sections, but DETAILED_POLYS yielded better results in others. This was when creating polygons ONLY. When the Service Area Layer was set to include both lines and polygons, polygon delineation improved (all other specifications held constant). Including lines takes considerably more time, but appears to be worth it for superior results in the polygons as well as leaving other options open for further analysis.
+
+****************************************************************************************
+
+1. If you haven't already, open your ArcMap document and add your Network Dataset, "RCL_ND".
+
+2. Run the "Make Service Area Layer" tool with the following specifications:
+   - Input Analysis Network: RCL_ND
+   - Output Layer Name: [your choice; suggest keeping "Service Area" in the name but prefacing it with something informative, such as "Boat Ramps Service Area".]
+   - Impedance Attribute: DriveTime
+   - Travel From or To Facility: TRAVEL_TO
+   - Default Break Values [your choice; recommend 5 10 15 20 25 30 35 40 45 50 55 60] 
+   - Time of Day [n/a]
+   - Cost Acuumulators: DriveTime
+   - Hierarchy: [n/a]
+   - Line Generation Options:
+      - Line Type: TRUE_LINES
+      - Overlap Lines: Unchecked
+      - Split Lines: Checked
+      - Include Network Source Fields: [your choice]
+   - Polygon Generation Options:
+      - Polygon Type: SIMPLE_POLYS
+      - Merge Polygons: MERGE
+      - Polygon Nest Option: RINGS
+      - Exclude Sources: [n/a]
+      - Polygon Trim: Uncheck this box
+   - Restrictions: leave defaults
+   
+3. Run the "Add Locations" tool with the following specifications:
+   - Input Network Analysis Layer: [your choice, e.g., Boat Ramps] Service Area
+   - Sub Layer: Facilities
+   - Input Locations: [your choice, e.g., a BoatRamps feature class]
+   - Field Mappings: [leave defaults]
+   - Use Network Location Fields: Unchecked
+   - Search Tolerance: [your choice; recommend 500 meters]
+   - Sort Field [n/a]
+   - Search Criteria:
+      - Roads, Shape
+   - Find Closest: Checked
+   - Append to Existing Locations: [Your choice; depends on situation]
+   - Snap to Network: Unchecked
+   - Exclude Restricted Portions: Unchecked
+   - Search Query: [n/a]
+   
+4. Run the "Solve" tool with the following specifications:
+   - Input Network Analysis Layer: [your choice, e.g., Boat Ramps] Service Area
+   - Leave defaults for everything else
+   This may take awhile depending on the complexity of your network and the number of facilities (targets).

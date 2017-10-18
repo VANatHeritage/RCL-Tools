@@ -1,6 +1,9 @@
 NETWORK ANALYST PROCEDURES
 How to set up a Network Dataset for Virginia roads
 
+Prepared by Kirsten Hazler
+Last Edit: 2017-10-18
+
 ****************************************************************************************
 
 IMPORTANT NOTE: A Network Dataset is created using a wizard within ArcMap. This process can NOT be accomplished with arcpy scripting. All the steps below starting from #7 must be done manually following the sequence dictated by the New Network Dataset wizard.
