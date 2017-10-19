@@ -19,7 +19,9 @@ The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS
 
 When the Service Area Layer was set to include both lines and polygons, polygon delineation improved, at least for SIMPLE_POLYS (all other specifications held constant). Including lines takes considerably more time, but appears to be worth it for superior results in the polygons as well as leaving other options open for further analysis. 
 
-Solving a service area layer with overlapping lines takes FOREVER. I haven't completed one yet.
+Solving a Service Area Layer with overlapping lines takes FOREVER. I haven't completed one yet.
+
+After you have created a Service Area Layer, you can right-click on it and select Properties to change the parameters in preparation to solve it again with different settings, or simply to check that the current settings are what you intended.
 
 ****************************************************************************************
 
