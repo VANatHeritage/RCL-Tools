@@ -2,7 +2,7 @@ NETWORK ANALYST PROCEDURES
 How to conduct a drive time analysis (= "Service Area Analysis") with Virginia roads and targets
 
 Prepared by Kirsten Hazler
-Last Edit: 2017-10-18
+Last Edit: 2017-10-19
 
 ****************************************************************************************
 
@@ -19,6 +19,8 @@ The service area polygons are squirrely. In a test around Richmond, SIMPLE_POLYS
 
 When the Service Area Layer was set to include both lines and polygons, polygon delineation improved, at least for SIMPLE_POLYS (all other specifications held constant). Including lines takes considerably more time, but appears to be worth it for superior results in the polygons as well as leaving other options open for further analysis. 
 
+Solving a service area layer with overlapping lines takes FOREVER. I haven't completed one yet.
+
 ****************************************************************************************
 
 1. If you haven't already, open your ArcMap document and add your Network Dataset, "RCL_ND".
@@ -27,14 +29,14 @@ When the Service Area Layer was set to include both lines and polygons, polygon 
    - Input Analysis Network: RCL_ND
    - Output Layer Name: [your choice; suggest keeping "Service Area" in the name but prefacing it with something informative, such as "Boat Ramps Service Area".]
    - Impedance Attribute: DriveTime
-   - Travel From or To Facility: TRAVEL_TO
+   - Travel From or To Facility: TRAVEL_FROM
    - Default Break Values [your choice; recommend 5 10 15 20 25 30 35 40 45 50 55 60] 
    - Time of Day [n/a]
    - Cost Acuumulators: DriveTime
    - Hierarchy: [n/a]
    - Line Generation Options:
       - Line Type: TRUE_LINES
-      - Overlap Lines: [depends; do overlap if you want to know how many of your targets are within a certain distance, but realize this may take a LOT longer than simple lines.]
+      - Overlap Lines: [depends; do overlap if you want to know how many of your targets are within a certain distance, but realize this will take a LOT longer than simple lines.]
       - Split Lines: Checked
       - Include Network Source Fields: [your choice]
    - Polygon Generation Options:
