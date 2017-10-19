@@ -5,5 +5,6 @@ For a Network Analyst tutorial, go here:
 http://help.arcgis.com/en/arcgisdesktop/10.0/pdf/network-analyst-tutorial.pdf
 
 Miscellaneous other links:
+
 "Google directions vs ESRI’s Network Analyst: Estimates of time and distance"
 http://zevross.com/blog/2014/07/23/google-directions-vs-esris-network-analyst-estimates-of-time-and-distance/
