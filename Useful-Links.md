@@ -11,6 +11,7 @@ MISCELLANEOUS OTHER LINKS:
 http://zevross.com/blog/2014/07/23/google-directions-vs-esris-network-analyst-estimates-of-time-and-distance/
 
 Urban Network Analysis Toolbox for ArcGIS  
-http://cityform.mit.edu/projects/urban-network-analysis.html
+http://cityform.mit.edu/projects/urban-network-analysis.html  
+https://bitbucket.org/cityformlab/urban-network-analysis-toolbox/src
 
 
