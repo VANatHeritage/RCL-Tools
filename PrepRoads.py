@@ -18,7 +18,7 @@ def printMsg(msg):
    print msg
 
 def PrepRoadsVA(inRCL):
-   """Prepares a Virginia Road Centerlines (RCL) feature class for further processing. This function assumes that there already exist some specific fields, including:
+   """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
  - LOCAL_SPEED_MPH 
  - MTFCC
  - SEGMENT_EXISTS
