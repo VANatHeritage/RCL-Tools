@@ -8,6 +8,13 @@
 # Summary:
 # A collection of functions for processing roads data and using them for various analyses.
 
+# Usage tips:
+# Use the following function sequence to do a travel time analysis based on a cost surface (raster):
+# - PrepRoadsVA
+# - PrepRoadsTIGER
+# - MergeRoads
+# - 
+
 # ---------------------------------------------------------------------------
 
 # Import modules
