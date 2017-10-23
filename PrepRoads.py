@@ -147,7 +147,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    return inRCL
 
 def PrepRoadsTIGER(inList, inBnd, outRoads):
-   """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that the inputs are in shapefile format, and that there already exist some specific fields, including:
+   """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
 - MTFCC
 - RTTYP
 If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
