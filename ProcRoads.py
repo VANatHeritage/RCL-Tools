@@ -19,11 +19,11 @@ def printMsg(msg):
    arcpy.AddMessage(msg)
    print msg
 
-def ProjectToMatch (fcTarget, fcTemplate):
-   """Project a target feature class to match the coordinate system of a template feature class"""
+def ProjectToMatch (fcTarget, csTemplate):
+   """Project a target feature class to match the coordinate system of a template dataset"""
    # Get the spatial reference of your target and template feature classes
    srTarget = arcpy.Describe(fcTarget).spatialReference # This yields an object, not a string
-   srTemplate = arcpy.Describe(fcTemplate).spatialReference 
+   srTemplate = arcpy.Describe(csTemplate).spatialReference 
 
    # Get the geographic coordinate system of your target and template feature classes
    gcsTarget = srTarget.GCS # This yields an object, not a string
