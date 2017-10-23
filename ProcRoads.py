@@ -18,6 +18,7 @@ arcpy.env.overwriteOutput = True
 def printMsg(msg):
    arcpy.AddMessage(msg)
    print msg
+   return
 
 def ProjectToMatch (fcTarget, csTemplate):
    """Project a target feature class to match the coordinate system of a template dataset"""
@@ -254,6 +255,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    arcpy.Merge_management (inList, outRoads, fldMappings)
    
    printMsg("Mission accomplished.")
+   return outRoads
 
 ############################################################################
 
