@@ -1,11 +1,12 @@
 # ---------------------------------------------------------------------------
-# PrepRoadsVA.py
+# ProcRoads.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
 # Last Edit: 2017-10-23
 
 # Summary:
+# A collection of functions for processing roads data and using them for various analyses.
 
 # ---------------------------------------------------------------------------
 
@@ -221,18 +222,52 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
+
+def MergeRoads(inList, outRoads):
+   """Merges VA RCL data with TIGER roads data, retaining only specified fields needed for travel time analysis in the output. 
+
+   Important assumptions:
+   - The input VA RCL data are the output of running the PrepRoadsVA function
+   - The input TIGER roads data are the output of running the PrepRoadsTIGER function.
+   - The above two inputs are in the same coordinate system.
    
-# Use the section below to enable a function (or set of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
+This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   
+   # If input inList is actually a string delimited with semi-colons, need to parse and turn it into a list.
+   if isinstance(inList, str):
+      inList = inList.split(';')
+      printMsg("String parsed.")
+   
+   # Create the field mapping
+   printMsg("Creating field mappings...")
+   inFlds = ['TravTime', 'UniqueID', 'RmpHwy', 'Speed_upd']
+   fldMappings = arcpy.FieldMappings()
+   for fld in inFlds:
+      fldMap = arcpy.FieldMap()
+      for tab in inList:
+         fldMap.addInputField(tab, fld)
+      fldMap.outputField.name = fld
+      fldMappings.addFieldMap(fldMap)
+   
+   # Merge datasets
+   printMsg("Merging datasets...")
+   arcpy.Merge_management (inList, outRoads, fldMappings)
+   
+   printMsg("Mission accomplished.")
+
+############################################################################
+
+# Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
+
 def main():
    # Set up your variables here
-   r1 = r'H:\Backups\GIS_Data_VA\TIGER\ROADS\County Downloads\Zip Archive\tl_2015_10005_roads\tl_2015_10005_roads.shp'
-   r2 = r'H:\Backups\GIS_Data_VA\TIGER\ROADS\County Downloads\Zip Archive\tl_2015_11001_roads\tl_2015_11001_roads.shp'
-   inList = [r1, r2]
-   inBnd = r'H:\Backups\DCR_Work_DellD\ConsVision_VulnMod\DataConsolidation\vm_Inputs.gdb\VA_Buff50mi'
-   outRoads = r'C:\Testing\RCL_Test.gdb\tlRoads'
+   rcl = r'C:\Testing\RCL_Test.gdb\RCL2017Q3_Subset'
+   tiger = r'C:\Testing\RCL_Test.gdb\tlRoads_prj'
+   inList = [rcl, tiger]
+   outRoads = r'C:\Testing\RCL_Test.gdb\mergeRoads'
    
    # Include the desired function run statement(s) below
-   PrepRoadsTIGER(inList, inBnd, outRoads)
+   MergeRoads(inList, outRoads)
    
    # End of user input
    

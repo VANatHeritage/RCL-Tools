@@ -15,7 +15,7 @@ Once you have successfully set up your Network Dataset using the steps below, yo
 
 2. Add your roads dataset to the map.
 
-3. If you haven't already, create and populate a "TravTime" field. The values in this field should represent the time it takes, in minutes, to traverse 1 meter along the road segment. (This can be done by first prepping the roads data with the script "PrepRoads.py".
+3. If you haven't already, create and populate a "TravTime" field. The values in this field should represent the time it takes, in minutes, to traverse 1 meter along the road segment. (This can be done by first prepping the roads data with functions in the script "ProcRoads.py".)
 
 4. Create a new file geodatabase named "RCL_Network.gdb".
 
