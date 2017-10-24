@@ -10,6 +10,8 @@
 
 # Import modules
 import arcpy, os
+from arcpy.sa import *
+arcpy.CheckOutExtension("Spatial")
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
