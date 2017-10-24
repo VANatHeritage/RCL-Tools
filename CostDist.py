@@ -64,7 +64,10 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
    printMsg('Mission accomplished.')
    
    return outCostSurf
-   
+
+############################################################################
+
+# Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
    # Set up your variables here
    inRoads = r'C:\Testing\RCL_Test.gdb\RCL2017Q3_Subset_prj'
