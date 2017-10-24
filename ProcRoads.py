@@ -19,51 +19,10 @@
 # - ProjectToMatch (to project one dataset to match the coordinate system of another)
 # ---------------------------------------------------------------------------
 
-# Import modules
-import arcpy, os
-scratchGDB = arcpy.env.scratchGDB
-arcpy.env.overwriteOutput = True
+# Import Helper module and functions
+import Helper
+from Helper import *
 
-def printMsg(msg):
-   arcpy.AddMessage(msg)
-   print msg
-   return
-
-def ProjectToMatch (fcTarget, csTemplate):
-   """Project a target feature class to match the coordinate system of a template dataset"""
-   # Get the spatial reference of your target and template feature classes
-   srTarget = arcpy.Describe(fcTarget).spatialReference # This yields an object, not a string
-   srTemplate = arcpy.Describe(csTemplate).spatialReference 
-
-   # Get the geographic coordinate system of your target and template feature classes
-   gcsTarget = srTarget.GCS # This yields an object, not a string
-   gcsTemplate = srTemplate.GCS
-
-   # Compare coordinate systems and decide what to do from there. 
-   if srTarget.Name == srTemplate.Name:
-      printMsg('Coordinate systems match; no need to do anything.')
-      return fcTarget
-   else:
-      printMsg('Coordinate systems do not match; proceeding with re-projection.')
-      if fcTarget[-3:] == 'shp':
-         fcTarget_prj = fcTarget[:-4] + "_prj.shp"
-      else:
-         fcTarget_prj = fcTarget + "_prj"
-      if gcsTarget.Name == gcsTemplate.Name:
-         printMsg('Datums are the same; no geographic transformation needed.')
-         arcpy.Project_management (fcTarget, fcTarget_prj, srTemplate)
-      else:
-         printMsg('Datums do not match; re-projecting with geographic transformation')
-         # Get the list of applicable geographic transformations
-         # This is a stupid long list
-         transList = arcpy.ListTransformations(srTarget,srTemplate) 
-         # Extract the first item in the list, assumed the appropriate one to use
-         geoTrans = transList[0]
-         # Now perform reprojection with geographic transformation
-         arcpy.Project_management (fcTarget, fcTarget_prj, srTemplate, geoTrans)
-      printMsg("Re-projected data is %s." % fcTarget_prj)
-      return fcTarget_prj
-   
 def PrepRoadsVA(inRCL):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
  - LOCAL_SPEED_MPH 
