@@ -156,5 +156,6 @@ printMsg('Copying features to disk...')
 arcpy.CopyFeatures_management(in_features=arcpy.mapping.ListLayers(outNALayer, 'Facilities')[0],out_feature_class=outputFolder + "/" + outNALayerName + "_Facilities.shp")
 arcpy.CopyFeatures_management(in_features=arcpy.mapping.ListLayers(outNALayer, 'Lines')[0],out_feature_class=outputFolder + "/" + outNALayerName + "_Lines.shp")
 arcpy.CopyFeatures_management(in_features=arcpy.mapping.ListLayers(outNALayer, 'Polygons')[0],out_feature_class=outputFolder + "/" + outNALayerName + "_Polygons.shp")
-
+t5 = datetime.now()
+printMsg('Finished copy at %s. Process complete.' % str(t5))
 #print 'Finished exporting all features at ' + str(time.ctime())
