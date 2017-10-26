@@ -12,46 +12,30 @@ Edited by: Kirsten Hazler, 2017-10-25
 # Import Helper module and functions
 import Helper
 from Helper import *
+
+#import arcpy
+#import time
+#import os
 from arcpy import env
 
 # Check out the Network Analyst extension license
 arcpy.CheckOutExtension("Network")
 
+# working folder for input facilities and outputs
+wf = r'C:\Testing\ConsVisionRecMod\Subsets'
 
-##################### User Options #####################
-# Input Data
-inNetworkDataset = r'C:\Testing\ConsVisionRecMod\Subsets\RCL_Network.gdb\RCL_ND'
-inFacilities = r'C:\Testing\ConsVisionRecMod\Subsets\all_facil_subset10.shp'
+# output name for a service area run
+outNALayerName = "ServAreaTrailheadsNoOverlap30"
 
-# Components of definition query for facilities
-fld = 'src_table' # The field upon which the query will be based
-valList = ['trailheads'] # The list of field value(s) to be included in the query
+# definition query for facilities
+defQuery = '"src_table" = \'trailheads\''
 
-# Output Data
-outDirectory = r'C:\Testing\ConsVisionRecMod\Subsets'
-outNALayerName = "tHeadsPolyOverlapLineOverlap30"
-
-# Options for creating Service Area analysis layer
-impedanceAttribute = "DriveTime"
-to_from = "TRAVEL_TO" #["TRAVEL_TO"|"TRAVEL_FROM"]
-serviceAreaBreaks = "30"
-poly_type = "DETAILED_POLYS" #["SIMPLE_POLYS"|"NO_POLYS"]
-merge_polys = "NO_MERGE" #["NO_MERGE"|"NO_OVERLAP"|"MERGE"]
-lines = "TRUE_LINES" #["NO_LINES"|"TRUE_LINES"|"TRUE_LINES_WITH_MEASURES"]
-merge_lines = "OVERLAP" #["OVERLAP"|"NON_OVERLAP"]
-split_lines = "SPLIT" #["SPLIT"|"NO_SPLIT"]
-
-# Options for adding facilities to Service Area analysis layer
-# How far can facility be from network to be included in analysis?
-searchTolerance = 500
-# Add to existing features (append) or overwrite with new features (clear)?
-appendclear = "CLEAR" # ["APPEND"/"CLEAR"] 
-
-################### End User Options ###################
-
+# environment settings
+env.workspace = wf + os.sep + 'RCL_Network.gdb'
+env.overwriteOutput = True
 
 # output files/folders (creates new folder with outputNALayerName in outputFolder)
-outputFolder = outDirectory + "/na_ServArea/output"
+outputFolder = wf + "/na_final/output"
 newdir = outputFolder + "/" + outNALayerName
 if not os.path.exists(newdir):
     os.makedirs(newdir)
@@ -62,15 +46,31 @@ else:
 outputFolder = newdir
 outLayerFile = outputFolder + "/" + outNALayerName + ".lyr"
 
+# name of network dataset
+inNetworkDataset = "RCL_ND"
+
+# input facilities shapefile
+inFacilities = wf + os.sep + 'all_facil_subset10.shp'
+
 # definition query for facilities layer
 arcpy.MakeFeatureLayer_management(inFacilities,"fac")
 fac_lyr = arcpy.mapping.Layer("fac")
-valString = ((str(valList)).replace('[', '(')).replace(']', ')')
-defQuery = '"%s" in %s' %(fld, valString)
 fac_lyr.definitionQuery = defQuery
 
 # how many sources?
 print 'Facilities count: ' + str(arcpy.GetCount_management("fac"))
+
+# some options for making the service area layer; change others directly in function calls
+impedanceAttribute = "DriveTime"
+to_from = "TRAVEL_TO" #["TRAVEL_TO"|"TRAVEL_FROM"]
+serviceAreaBreaks = "30"
+poly_type = "DETAILED_POLYS" #["SIMPLE_POLYS"|"NO_POLYS"]
+merge_polys = "MERGE" #["NO_MERGE"|"NO_OVERLAP"|"MERGE"]
+
+# distance within roads to search for facilities
+searchTolerance = 500
+# add new features or clear 
+appendclear = "CLEAR" # ["APPEND"/"CLEAR"]
 
 # Make service area layer 
 outNALayer = arcpy.na.MakeServiceAreaLayer(in_network_dataset=inNetworkDataset,
@@ -81,9 +81,9 @@ outNALayer = arcpy.na.MakeServiceAreaLayer(in_network_dataset=inNetworkDataset,
       polygon_type=poly_type,
       merge=merge_polys, 
       nesting_type="RINGS", 
-      line_type=lines,
-      overlap=merge_lines, 
-      split=split_lines,
+      line_type="TRUE_LINES",
+      overlap="NON_OVERLAP", 
+      split="SPLIT",
       # excluded_source_name="[]",
       accumulate_attribute_name="DriveTime",
       UTurn_policy="ALLOW_UTURNS",

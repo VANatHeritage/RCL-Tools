@@ -10,6 +10,7 @@
 
 # Import modules
 import arcpy, os
+from datetime import datetime as datetime
 from arcpy.sa import *
 arcpy.CheckOutExtension("Spatial")
 scratchGDB = arcpy.env.scratchGDB
@@ -54,3 +55,11 @@ def ProjectToMatch (fcTarget, csTemplate):
          arcpy.Project_management (fcTarget, fcTarget_prj, srTemplate, geoTrans)
       printMsg("Re-projected data is %s." % fcTarget_prj)
       return fcTarget_prj
+      
+def GetElapsedTime (t1, t2):
+   """Gets the time elapsed between the start time (t1) and the finish time (t2)."""
+   delta = t2 - t1
+   (d, m, s) = (delta.days, delta.seconds/60, delta.seconds%60)
+   deltaString = '%s days, %s minutes, %s seconds' % (str(d), str(m), str(s))
+   return deltaString
+   
