@@ -7,21 +7,24 @@ Assumes an already-created network dataset. (See NetworkAnalyst-Setup.txt for in
 Created on Mon Oct 23 11:44:44 2017
 
 @author: David Bucklin and Kirsten Hazler
-Last edit: 2017-10-26 (krh)
+Last edit: 2017-10-27 (krh)
 """
 
 
 ##################### User Options #####################
 # Input Data
-inNetworkDataset = r'C:\Testing\ConsVisionRecMod\Subsets\RCL_Network.gdb\RCL_ND'
-inFacilities = r'C:\Testing\ConsVisionRecMod\Subsets\all_facil_subset.shp'
+inNetworkDataset = r'C:\Testing\ConsVisionRecMod\rec_model\na_final\RCL_Network.gdb\RCL\RCL_ND'
+inFacilities = r'C:\Testing\ConsVisionRecMod\rec_model\model_input_recfacilities\all_facil.shp'
 
 # Components of definition query for facilities
 fld = 'src_table' # The field upon which the query will be based
 valList = ['trailheads'] # The list of field value(s) to be included in the query
 
+# Field to use for unique ID of facilities
+fld_facID = 'new_id'
+
 # Output Data
-outDirectory = r'C:\Testing\ConsVisionRecMod\Subsets'
+outDirectory = r'C:\Testing\ConsVisionRecMod\Statewide'
 outNALayerName = "trlHds"
 
 # Options for creating Service Area analysis layer
@@ -39,11 +42,9 @@ split_lines = "SPLIT" #["SPLIT"|"NO_SPLIT"]
 searchTolerance = 500
 # Add to existing features (append) or overwrite with new features (clear)?
 appendclear = "CLEAR" # ["APPEND"/"CLEAR"] 
-# Field to use for unique ID of facilities
-fld_facID = 'new_id'
+
 
 ################### End User Options ###################
-
 
 
 # Import Helper module and functions
@@ -56,7 +57,7 @@ arcpy.CheckOutExtension("Network")
 
 # Initialize variables and settings for analysis
 # Output files/folders (creates new folder with outputNALayerName in outputFolder)
-outputFolder = outDirectory + "/na_ServArea/output"
+outputFolder = outDirectory + os. sep + "na_ServArea" + os. sep + "output"
 newdir = outputFolder + os.sep + outNALayerName
 if not os.path.exists(newdir):
     os.makedirs(newdir)
@@ -194,7 +195,7 @@ for id in id_List:
    finally:
       myIndex += 1
 
-if len(myFailList > 0:
+if len(myFailList) > 0:
    num_Fails = len(myFailList)
    printMsg('\nProcess complete, but the following %s facility IDs failed: %s.' % (str(num_Fails), str(myFailList)))
 
