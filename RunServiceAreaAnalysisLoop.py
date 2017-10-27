@@ -14,7 +14,7 @@ Last edit: 2017-10-26 (krh)
 ##################### User Options #####################
 # Input Data
 inNetworkDataset = r'C:\Testing\ConsVisionRecMod\Subsets\RCL_Network.gdb\RCL_ND'
-inFacilities = r'C:\Testing\ConsVisionRecMod\Subsets\all_facil_subset10.shp'
+inFacilities = r'C:\Testing\ConsVisionRecMod\Subsets\all_facil_subset.shp'
 
 # Components of definition query for facilities
 fld = 'src_table' # The field upon which the query will be based
@@ -22,12 +22,12 @@ valList = ['trailheads'] # The list of field value(s) to be included in the quer
 
 # Output Data
 outDirectory = r'C:\Testing\ConsVisionRecMod\Subsets'
-outNALayerName = "tHeadsLoop3060"
+outNALayerName = "trlHds"
 
 # Options for creating Service Area analysis layer
 impedanceAttribute = "DriveTime"
 to_from = "TRAVEL_TO" #["TRAVEL_TO"|"TRAVEL_FROM"]
-serviceAreaBreaks = "30 60"
+serviceAreaBreaks = "30"
 poly_type = "DETAILED_POLYS" #["SIMPLE_POLYS"|"NO_POLYS"]
 merge_polys = "MERGE" #["NO_MERGE"|"NO_OVERLAP"|"MERGE"]
 lines = "TRUE_LINES" #["NO_LINES"|"TRUE_LINES"|"TRUE_LINES_WITH_MEASURES"]
@@ -57,7 +57,7 @@ arcpy.CheckOutExtension("Network")
 # Initialize variables and settings for analysis
 # Output files/folders (creates new folder with outputNALayerName in outputFolder)
 outputFolder = outDirectory + "/na_ServArea/output"
-newdir = outputFolder + "/" + outNALayerName
+newdir = outputFolder + os.sep + outNALayerName
 if not os.path.exists(newdir):
     os.makedirs(newdir)
 else: 
@@ -65,7 +65,7 @@ else:
     exit()
 
 outputFolder = newdir
-outLayerFile = outputFolder + "/" + outNALayerName + ".lyr"
+outLayerFile = outputFolder + os.sep + outNALayerName + ".lyr"
 outGDB = outputFolder + os.sep + outNALayerName + ".gdb"
 arcpy.CreateFileGDB_management(outputFolder, outNALayerName + ".gdb")
 
@@ -140,7 +140,7 @@ for id in id_List:
    try: 
       # Select the facilities
       arcpy.env.workspace = "in_memory"
-      selQry = fld_facID + " = '%s'" % id
+      selQry = fld_facID + " = '%s'" % id 
       arcpy.Select_analysis (lyr_fac, "tmp_fac", selQry)
       num_pts = countFeatures("tmp_fac")
       printMsg('There are %s location points in this group.' % str(num_pts))
@@ -194,7 +194,9 @@ for id in id_List:
    finally:
       myIndex += 1
 
-printMsg('\nProcess complete, but the following facility IDs failed: %s.' % str(myFailList))
+if len(myFailList > 0:
+   num_Fails = len(myFailList)
+   printMsg('\nProcess complete, but the following %s facility IDs failed: %s.' % (str(num_Fails), str(myFailList)))
 
 # End the timer
 t4 = datetime.now()

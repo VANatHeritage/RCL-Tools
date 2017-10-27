@@ -95,6 +95,7 @@ def GetElapsedTime (t1, t2):
    """Gets the time elapsed between the start time (t1) and the finish time (t2)."""
    delta = t2 - t1
    (d, m, s) = (delta.days, delta.seconds/60, delta.seconds%60)
-   deltaString = '%s days, %s minutes, %s seconds' % (str(d), str(m), str(s))
+   (h, m) = (m/60, m%60)
+   deltaString = '%s days, %s hours, %s minutes, %s seconds' % (str(d), str(h), str(m), str(s))
    return deltaString
    
