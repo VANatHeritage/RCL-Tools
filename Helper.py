@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-11/7
+# Last Edit: 2017-11-7
 
 # Summary:
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
