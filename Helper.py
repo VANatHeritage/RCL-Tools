@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-10-24
+# Last Edit: 2017-11/7
 
 # Summary:
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
@@ -11,8 +11,8 @@
 # Import modules
 import arcpy, os, sys, traceback
 from datetime import datetime as datetime
-from arcpy.sa import *
-arcpy.CheckOutExtension("Spatial")
+#from arcpy.sa import *
+#arcpy.CheckOutExtension("Spatial")
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
 
@@ -55,7 +55,17 @@ def unique_values(table, field):
    Thanks, ArcPy Cafe! https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
    with arcpy.da.SearchCursor(table, [field]) as cursor:
       return sorted({row[0] for row in cursor})
-   
+
+def TabToDict(inTab, fldKey, fldValue):
+   '''Converts two fields in a table to a dictionary'''
+   codeDict = {}
+   with arcpy.da.SearchCursor(inTab, [fldKey, fldValue]) as sc:
+      for row in sc:
+         key = sc[0]
+         val = sc[1]
+         codeDict[key] = val
+   return codeDict
+      
 def ProjectToMatch (fcTarget, csTemplate):
    """Project a target feature class to match the coordinate system of a template dataset"""
    # Get the spatial reference of your target and template feature classes
