@@ -9,7 +9,8 @@
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
 
 # Import modules
-import arcpy, os
+import arcpy, os, sys, traceback
+from datetime import datetime as datetime
 from arcpy.sa import *
 arcpy.CheckOutExtension("Spatial")
 scratchGDB = arcpy.env.scratchGDB
@@ -19,7 +20,42 @@ def printMsg(msg):
    arcpy.AddMessage(msg)
    print msg
    return
+   
+def printWrng(msg):
+   arcpy.AddWarning(msg)
+   print 'Warning: ' + msg
+   return
+   
+def printErr(msg):
+   arcpy.AddError(msg)
+   print 'Error: ' + msg
+   return
+   
+def tbackInLoop():
+   '''Standard error handling routing to add to bottom of scripts'''
+   tb = sys.exc_info()[2]
+   tbinfo = traceback.format_tb(tb)[0]
+   pymsg = "PYTHON ERRORS:\nTraceback Info:\n" + tbinfo + "\nError Info:\n " + str(sys.exc_info()[1])
+   msgs = arcpy.GetMessages(1)
+   msgList = [pymsg, msgs]
 
+   #printWrng(msgs)
+   printWrng(pymsg)
+   printMsg(msgs)
+   
+   return msgList
+
+def countFeatures(features):
+   '''Gets count of features'''
+   count = int((arcpy.GetCount_management(features)).getOutput(0))
+   return count
+   
+def unique_values(table, field):
+   ''' Gets list of unique values in a field.
+   Thanks, ArcPy Cafe! https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
+   with arcpy.da.SearchCursor(table, [field]) as cursor:
+      return sorted({row[0] for row in cursor})
+   
 def ProjectToMatch (fcTarget, csTemplate):
    """Project a target feature class to match the coordinate system of a template dataset"""
    # Get the spatial reference of your target and template feature classes
@@ -54,3 +90,12 @@ def ProjectToMatch (fcTarget, csTemplate):
          arcpy.Project_management (fcTarget, fcTarget_prj, srTemplate, geoTrans)
       printMsg("Re-projected data is %s." % fcTarget_prj)
       return fcTarget_prj
+      
+def GetElapsedTime (t1, t2):
+   """Gets the time elapsed between the start time (t1) and the finish time (t2)."""
+   delta = t2 - t1
+   (d, m, s) = (delta.days, delta.seconds/60, delta.seconds%60)
+   (h, m) = (m/60, m%60)
+   deltaString = '%s days, %s hours, %s minutes, %s seconds' % (str(d), str(h), str(m), str(s))
+   return deltaString
+   
