@@ -225,7 +225,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Mission accomplished.")
    return outRoads
 
-def ExtractRCL_su(inRCL, outRCL)
+def ExtractRCL_su(inRCL, outRCL):
    """Extracts the relevant features from the Virginia Road Centerlines (RCL) feature class to be used for creating road surfaces. Omits segments based on data in the MTFCC and SEGMENT_TYPE fields. If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
    
 Excludes the following MTFCC types:
@@ -248,6 +248,56 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   return outRCL
+   
+def PrepRoadsVA_su(inRCL, inVDOT):
+   """Adds fields to road centerlines data, necessary for generating road surfaces.
+
+This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+
+   # Define a class to store field information
+   class Field:
+      def __init__(self, Name = '', Type = '', Length = ''):
+         self.Name = Name
+         self.Type = Type
+         self.Length = Length
+   
+   # Specify fields to add
+   # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage   
+   fldBuffM = Field('NH_BUFF_M', 'DOUBLE', '') # Buffer width in meters. This field is calculated automatically based on information in other fields.
+   fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '') # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed.
+   fldComments = Field('NH_COMMENTS', 'TEXT', 500) # QC/processing/editing comments. This field is for automatic or manual data entry.
+   fldBuffFt = Field('NH_BUFF_FT', 'DOUBLE', '') # Buffer width in feet. This field is for manual data entry, used to override buffer width values that would otherwise be calculated.
+   addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt]
+   
+   # Add the fields
+   for f in addFields:
+      arcpy.AddField_management (inRCL, f.Name, f.Type, '', '', f.Length)
+      printMsg('Field %s added.' % f.Name)
+   
+   # Join fields from VDOT table
+   vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
+   JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   
+   # Calculate flag field
+   expression = "calcFlagFld(!VDOT_SURFACE_WIDTH_MSR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
+   code_block = '''def calcFlagFld(width, mtfcc, routeType):
+      if width == None or width == 0: 
+         return -1
+      elif width < 24 and (mtfcc in ('S1100', 'S1100HOV') or routeType == 'IS'):
+         return -1
+      elif width < 22 and (mtfcc == 'S1200PRI' or routeType in ('SR', 'US')):
+         return -1
+      elif width < 20 and mtfcc == 'S1200LOC':
+         return -1
+      elif width < 18:
+         return -1
+      else: 
+         return 0'''
+   arcpy.CalculateField_management (inRCL, fldFlag.Name, expression, 'PYTHON', code_block)
+   
+   return inRCL
    
 ############################################################################
 
