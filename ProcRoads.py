@@ -3,16 +3,16 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2017-10-24
+# Last Edit: 2017-12-4
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
 
 # Usage tips:
 # Use the following function sequence to prepare roads for travel time analysis:
-# - PrepRoadsVA (to prepare Virginia RCL data)
-# - PrepRoadsTIGER (to prepare TIGER roads data from adjacent states)
-# - MergeRoads (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
+# - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
+# - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
+# - MergeRoads_tt (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
 # 
 # The following functions are helper functions called by the above functions:
 # - printMsg (shortcut for informative progress messaging)
@@ -23,7 +23,7 @@
 import Helper
 from Helper import *
 
-def PrepRoadsVA(inRCL):
+def PrepRoadsVA_tt(inRCL):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
  - LOCAL_SPEED_MPH 
  - MTFCC
@@ -116,7 +116,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
-def PrepRoadsTIGER(inList, inBnd, outRoads):
+def PrepRoadsTIGER_tt(inList, inBnd, outRoads):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
 - MTFCC
 - RTTYP
@@ -192,7 +192,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
 
-def MergeRoads(inList, outRoads):
+def MergeRoads_tt(inList, outRoads):
    """Merges VA RCL data with TIGER roads data, retaining only specified fields needed for travel time analysis in the output. 
 
    Important assumptions:
