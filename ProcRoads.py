@@ -225,6 +225,30 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Mission accomplished.")
    return outRoads
 
+def ExtractRCL_su(inRCL, outRCL)
+   """Extracts the relevant features from the Virginia Road Centerlines (RCL) feature class to be used for creating road surfaces. Omits segments based on data in the MTFCC and SEGMENT_TYPE fields. If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
+   
+Excludes the following MTFCC types:
+- S1730: Alleys
+- S1780: Parking Lot Roads
+- S9999: Driveways
+- S1710: Walkways/Pedestrian Trails
+- S1720: Stairways
+- S1740: Service Vehicle Private Drves
+- S1820: Bike Paths or Trails
+- S1830: Bridle Paths
+- S1500: 4WD Vehicular Trails
+
+Excludes the following SEGMENT_TYPE values:
+- 2: Bridge/Overpass
+- 10: Tunnel/Underpass
+- 50: Ferry Crossing
+
+This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+
+   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
