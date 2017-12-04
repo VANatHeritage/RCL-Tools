@@ -295,7 +295,152 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
          return -1
       else: 
          return 0'''
-   arcpy.CalculateField_management (inRCL, fldFlag.Name, expression, 'PYTHON', code_block)
+   arcpy.CalculateField_management (inRCL, 'NH_SURFWIDTH_FLAG', expression, 'PYTHON', code_block)
+   
+   return inRCL
+   
+def AssignBuffer_su(inRCL):
+   """Assign road surface buffer width based on other attribute fields.
+
+This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+
+   # Get formatted time stamp and auto-generated comment
+   ts = datetime.now()
+   stamp = '%s-%s-%s %s:%s' % (ts.year, str(ts.month).zfill(2), str(ts.day).zfill(2), str(ts.hour).zfill(2), str(ts.minute).zfill(2))
+   comment = "Buffer distance auto-calculated %s" % stamp
+   
+   # Calculate fields
+   expression = "calculateBuffer(!NH_SURFWIDTH_FLAG!, !NH_BUFF_FT!, !VDOT_SURFACE_WIDTH_MSR!, !LOCAL_SPEED_MPH!, !VDOT_TRAFFIC_AADT_NBR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
+   code_block = 
+   """def calculateBuffer(flag, override, surfwidth, speed, vehicles, mtfcc, routeType):
+      convFactor = 0.1524 # This converts feet to meters, then divides by 2 to get buffer width
+      
+      if override == None:
+      # If no manual value has been entered, assign defaults based on road type, speed, and traffic volume
+         if speed == None or speed == 0:
+            speed = 25
+            
+         if vehicles == None or vehicles == 0:
+            trafficVol = 1
+         elif vehicles < 400:
+            trafficVol = 1
+         elif vehicles < 1500:
+            trafficVol = 2
+         elif vehicles < 2000:
+            trafficVol = 3
+         else:
+            trafficVol = 4
+         
+         if flag == 0:
+            laneWidth = surfwidth
+         
+         # Freeways
+         if mtfcc in ('S1100', 'S1100HOV') or routeType == 'IS':
+            if flag == -1:
+               laneWidth = 24
+            shoulderWidth = 24
+
+         # Arterials
+         elif mtfcc == 'S1200PRI' or routeType in ('SR', 'US'):
+            if flag == -1:
+               if speed <= 45:
+                  if trafficVol <= 3:  
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               elif speed <= 55:
+                  if trafficVol <= 2:  
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               else:
+                  laneWidth = 24
+            if trafficVol == 1:
+               shoulderWidth = 8
+            elif trafficVol <= 3:
+               shoulderWidth = 12
+            else:
+               shoulderWidth = 16
+         
+         # Collectors   
+         elif mtfcc == 'S1200LOC':
+            if flag == -1:
+               if speed <= 30:
+                  if trafficVol <= 2:  
+                     laneWidth = 20
+                  elif trafficVol <= 3:
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               elif speed <= 50:
+                  if trafficVol <= 1:  
+                     laneWidth = 20
+                  elif trafficVol <= 3:
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               else:
+                  if trafficVol <= 2:  
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+            if trafficVol == 1:
+               shoulderWidth = 4
+            elif trafficVol == 2:
+               shoulderWidth = 10
+            elif trafficVol == 3:
+               shoulderWidth = 12
+            else:
+               shoulderWidth = 16
+         
+         # Local roads
+         else: 
+            if flag == -1:
+               if speed <= 15:
+                  if trafficVol == 1:  
+                     laneWidth = 18
+                  elif trafficVol <= 3:
+                     laneWidth = 20
+                  else: 
+                     laneWidth = 22
+               elif speed <= 40:
+                  if trafficVol == 1:  
+                     laneWidth = 18
+                  elif trafficVol == 2:
+                     laneWidth = 20
+                  elif trafficVol == 3:
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               elif speed <= 50:
+                  if trafficVol == 1:  
+                     laneWidth = 20
+                  elif trafficVol <= 3:
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+               else:
+                  if trafficVol <= 2:
+                     laneWidth = 22
+                  else: 
+                     laneWidth = 24
+            if trafficVol == 1:
+               shoulderWidth = 4
+            elif trafficVol == 2:
+               shoulderWidth = 10
+            elif trafficVol == 3:
+               shoulderWidth = 12
+            else:
+               shoulderWidth = 16
+         
+         roadWidth_FT = laneWidth + shoulderWidth
+         buff_M = roadWidth_FT * convFactor
+      else:
+      # Use manually measured value if it exists
+         buff_M = override*convFactor*2
+      return buff_M"""
+   arcpy.CalculateField_management (inRCL, NH_BUFF_M, expression, 'PYTHON', code_block)
+   arcpy.CalculateField_management (inRCL, NH_COMMENTS, comment, 'PYTHON')
    
    return inRCL
    
