@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2017-12-4
+# Last Edit: 2017-12-05
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -253,6 +253,8 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
 def PrepRoadsVA_su(inRCL, inVDOT):
    """Adds fields to road centerlines data, necessary for generating road surfaces.
+- inRCL = road centerlines feature class
+- inVDOT = VDOT attribute table (from same geodatabase as inRCL)
 
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
@@ -266,10 +268,11 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    # Specify fields to add
    # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage   
    fldBuffM = Field('NH_BUFF_M', 'DOUBLE', '') # Buffer width in meters. This field is calculated automatically based on information in other fields.
-   fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '') # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed.
+   fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '') # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed (-1 = needs attention; 0 = OK; 1 = record reviewed and amended)
    fldComments = Field('NH_COMMENTS', 'TEXT', 500) # QC/processing/editing comments. This field is for automatic or manual data entry.
    fldBuffFt = Field('NH_BUFF_FT', 'DOUBLE', '') # Buffer width in feet. This field is for manual data entry, used to override buffer width values that would otherwise be calculated.
-   addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt]
+   fldConSite = Field('NH_CONSITE', 'SHORT', '') # Field to indicate if segment relevant to ConSite delineation (1 = close enough to features to be relevant; 0 = not relevant)
+   addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt, fldConSite]
    
    # Add the fields
    for f in addFields:
@@ -443,6 +446,26 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    arcpy.CalculateField_management (inRCL, NH_COMMENTS, comment, 'PYTHON')
    
    return inRCL
+
+def CheckConSite_su(inRCL, inFeats, searchDist):
+   """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
+   
+This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   arcpy.MakeFeatureLayer_management(inRCL, "lyrRCL")
+   SelectLayerByLocation_management ("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION", "NOT_INVERT")
+   arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 1, "PYTHON")
+   arcpy.SelectLayerByAttribute_management("lyrRCL", "SWITCH_SELECTION")
+   arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 0, "PYTHON")
+   
+   return inRCL
+      
+def CreateRoadSurfaces_su(inRCL, outSurfaces):
+   """Generates road surfaces from road centerlines.
+   
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   
+   arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   return outSurfaces
    
 ############################################################################
 
