@@ -247,7 +247,9 @@ Excludes the following SEGMENT_TYPE values:
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
+   printMsg('Extracting relevant road segments and saving...')
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   printMsg('Roads exracted.')
    
    return outRCL
    
@@ -266,6 +268,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
          self.Length = Length
    
    # Specify fields to add
+   printMsg('Setting field definitions')
    # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage   
    fldBuffM = Field('NH_BUFF_M', 'DOUBLE', '') # Buffer width in meters. This field is calculated automatically based on information in other fields.
    fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '') # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed (-1 = needs attention; 0 = OK; 1 = record reviewed and amended)
@@ -275,15 +278,18 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt, fldConSite]
    
    # Add the fields
+   printMsg('Adding fields...')
    for f in addFields:
       arcpy.AddField_management (inRCL, f.Name, f.Type, '', '', f.Length)
       printMsg('Field %s added.' % f.Name)
    
    # Join fields from VDOT table
+   printMsg('Joining attributes from VDOT table')
    vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
    JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
    
    # Calculate flag field
+   printMsg('Calculating flag field')
    expression = "calcFlagFld(!VDOT_SURFACE_WIDTH_MSR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
    code_block = '''def calcFlagFld(width, mtfcc, routeType):
       if width == None or width == 0: 
@@ -300,6 +306,8 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
          return 0'''
    arcpy.CalculateField_management (inRCL, 'NH_SURFWIDTH_FLAG', expression, 'PYTHON', code_block)
    
+   printMsg('Roads attribute table updated.')
+   
    return inRCL
    
 def AssignBuffer_su(inRCL):
@@ -314,8 +322,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
    # Calculate fields
    expression = "calculateBuffer(!NH_SURFWIDTH_FLAG!, !NH_BUFF_FT!, !VDOT_SURFACE_WIDTH_MSR!, !LOCAL_SPEED_MPH!, !VDOT_TRAFFIC_AADT_NBR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
-   code_block = 
-   """def calculateBuffer(flag, override, surfwidth, speed, vehicles, mtfcc, routeType):
+   code_block = """def calculateBuffer(flag, override, surfwidth, speed, vehicles, mtfcc, routeType):
       convFactor = 0.1524 # This converts feet to meters, then divides by 2 to get buffer width
       
       if override == None:
@@ -465,6 +472,7 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
    This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
    
    arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   
    return outSurfaces
    
 ############################################################################
@@ -473,13 +481,13 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
 
 def main():
    # Set up your variables here
-   rcl = r'C:\Testing\RCL_Test.gdb\RCL2017Q3_Subset'
-   tiger = r'C:\Testing\RCL_Test.gdb\tlRoads_prj'
-   inList = [rcl, tiger]
-   outRoads = r'C:\Testing\RCL_Test.gdb\mergeRoads'
+   inRCL = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VA_CENTERLINE'
+   outRCL = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_subset'
+   inVDOT = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VDOT_ATTRIBUTE'
    
    # Include the desired function run statement(s) below
-   MergeRoads(inList, outRoads)
+   # ExtractRCL_su(inRCL, outRCL)
+   PrepRoadsVA_su(outRCL, inVDOT)
    
    # End of user input
    

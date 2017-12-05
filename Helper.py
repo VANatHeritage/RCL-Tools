@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-11-13
+# Last Edit: 2017-12-05
 
 # Summary:
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
@@ -108,16 +108,25 @@ def JoinFields(ToTab, fldToJoin, FromTab, fldFromJoin, addFields):
    fldFromJoin = the key field in FromTab, used to match records in ToTab
    addFields = the list of fields to be added'''
    
+   codeblock = '''def getFldVal(srcID, fldDict):
+      try:
+         fldVal = fldDict[srcID]
+      except:
+         fldVal = None
+      return fldVal'''
+   
    for fld in addFields:
+      printMsg('Working on "%s" field...' %fld)
       fldObject = arcpy.ListFields(FromTab, fld)[0]
       fldDict = TabToDict(FromTab, fldFromJoin, fld)
-      codeblock = '''def getFldVal(srcID, fldDict):
-         fldVal = fldDict[srcID]
-         return fldVal'''
+      printMsg('Established data dictionary.')
       expression = 'getFldVal(!%s!, %s)' % (fldToJoin, fldDict)
-      srcFields = arcpy.ListFields(ToTab)
-      arcpy.AddField_management (ToTab, fld, fldObject.type, '', '', fldObject.length)
+      srcFields = arcpy.ListFields(ToTab, fld)
+      if len(srcFields) == 0:
+         arcpy.AddField_management (ToTab, fld, fldObject.type, '', '', fldObject.length)
+      printMsg('Calculating...')
       arcpy.CalculateField_management (ToTab, fld, expression, 'PYTHON', codeblock)
+      printMsg('"%s" field done.' %fld)
    return ToTab
    
 def SpatialCluster (inFeats, fldID, searchDist, fldGrpID = 'grpID'):
