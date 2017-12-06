@@ -315,6 +315,10 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 def AssignBuffer_su(inRCL):
    """Assign road surface buffer width based on other attribute fields.
 
+The codeblock used to assign buffer widths is based on information here:
+https://nacto.org/docs/usdg/geometric_design_highways_and_streets_aashto.pdf. 
+See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled way and shoulders for different road types and capacities. Relevant pages: 388,429,452, 476-478, 507-509. There's some seriously scintillating bedtime reading right here <snark>.
+
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    # Get formatted time stamp and auto-generated comment
@@ -323,6 +327,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    comment = "Buffer distance auto-calculated %s" % stamp
    
    # Calculate fields
+   printMsg('Calculating buffer widths. This could take awhile...')
    expression = "calculateBuffer(!NH_SURFWIDTH_FLAG!, !NH_BUFF_FT!, !VDOT_SURFACE_WIDTH_MSR!, !LOCAL_SPEED_MPH!, !VDOT_TRAFFIC_AADT_NBR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
    code_block = """def calculateBuffer(flag, override, surfwidth, speed, vehicles, mtfcc, routeType):
       convFactor = 0.1524 # This converts feet to meters, then divides by 2 to get buffer width
@@ -454,14 +459,17 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    arcpy.CalculateField_management (inRCL, 'NH_BUFF_M', expression, 'PYTHON', code_block)
    arcpy.CalculateField_management (inRCL, 'NH_COMMENTS', '"%s"' %comment, 'PYTHON')
    
+   printMsg('Mission accomplished.')
+   
    return inRCL
 
 def CreateRoadSurfaces_su(inRCL, outSurfaces):
    """Generates road surfaces from road centerlines.
    
    This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
-   
+   printMsg('Creating road surfaces. This could take awhile...')
    arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   printMsg('Mission accomplished.')
    
    return outSurfaces
    
@@ -469,6 +477,7 @@ def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   
    arcpy.MakeFeatureLayer_management(inRCL, "lyrRCL")
    SelectLayerByLocation_management ("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION", "NOT_INVERT")
    arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 1, "PYTHON")
@@ -486,16 +495,14 @@ def main():
    inRCL = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VA_CENTERLINE'
    outRCL = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_subset_20171206'
    inVDOT = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VDOT_ATTRIBUTE'
+   outSurfaces = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_surfaces_20171206'
    
    # Include the desired function run statement(s) below
    #ExtractRCL_su(inRCL, outRCL)
    #PrepRoadsVA_su(outRCL, inVDOT)
-   # AssignBuffer_su(outRCL)
-   
-   ts = datetime.now()
-   stamp = '%s-%s-%s %s:%s' % (ts.year, str(ts.month).zfill(2), str(ts.day).zfill(2), str(ts.hour).zfill(2), str(ts.minute).zfill(2))
-   comment = "Buffer distance auto-calculated %s" % stamp
-   arcpy.CalculateField_management (outRCL, 'NH_COMMENTS', '"%s"' %comment, 'PYTHON')
+   #AssignBuffer_su(outRCL)
+   CreateRoadSurfaces_su(outRCL, outSurfaces)
+
    
    # End of user input
    
