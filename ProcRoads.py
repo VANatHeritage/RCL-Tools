@@ -451,11 +451,20 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
       # Use manually measured value if it exists
          buff_M = override*convFactor*2
       return buff_M"""
-   arcpy.CalculateField_management (inRCL, NH_BUFF_M, expression, 'PYTHON', code_block)
-   arcpy.CalculateField_management (inRCL, NH_COMMENTS, comment, 'PYTHON')
+   arcpy.CalculateField_management (inRCL, 'NH_BUFF_M', expression, 'PYTHON', code_block)
+   arcpy.CalculateField_management (inRCL, 'NH_COMMENTS', '"%s"' %comment, 'PYTHON')
    
    return inRCL
 
+def CreateRoadSurfaces_su(inRCL, outSurfaces):
+   """Generates road surfaces from road centerlines.
+   
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   
+   arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   
+   return outSurfaces
+   
 def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
@@ -468,15 +477,6 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
    return inRCL
       
-def CreateRoadSurfaces_su(inRCL, outSurfaces):
-   """Generates road surfaces from road centerlines.
-   
-   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
-   
-   arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
-   
-   return outSurfaces
-   
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
@@ -488,8 +488,14 @@ def main():
    inVDOT = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VDOT_ATTRIBUTE'
    
    # Include the desired function run statement(s) below
-   ExtractRCL_su(inRCL, outRCL)
-   PrepRoadsVA_su(outRCL, inVDOT)
+   #ExtractRCL_su(inRCL, outRCL)
+   #PrepRoadsVA_su(outRCL, inVDOT)
+   # AssignBuffer_su(outRCL)
+   
+   ts = datetime.now()
+   stamp = '%s-%s-%s %s:%s' % (ts.year, str(ts.month).zfill(2), str(ts.day).zfill(2), str(ts.hour).zfill(2), str(ts.minute).zfill(2))
+   comment = "Buffer distance auto-calculated %s" % stamp
+   arcpy.CalculateField_management (outRCL, 'NH_COMMENTS', '"%s"' %comment, 'PYTHON')
    
    # End of user input
    
