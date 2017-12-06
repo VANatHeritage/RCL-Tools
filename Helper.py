@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-12-05
+# Last Edit: 2017-12-06
 
 # Summary:
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
@@ -101,6 +101,8 @@ def TabToDict(inTab, fldKey, fldValue):
 
 def JoinFields(ToTab, fldToJoin, FromTab, fldFromJoin, addFields):
    '''An alternative to arcpy's JoinField_management, which is unbearably slow.
+
+   Further testing has revealed that sometimes this alternative method is much much worse. YMMV.
    
    ToTab = The table to which fields will be added
    fldToJoin = The key field in ToTab, used to match records in FromTab
@@ -124,7 +126,7 @@ def JoinFields(ToTab, fldToJoin, FromTab, fldFromJoin, addFields):
       srcFields = arcpy.ListFields(ToTab, fld)
       if len(srcFields) == 0:
          arcpy.AddField_management (ToTab, fld, fldObject.type, '', '', fldObject.length)
-      printMsg('Calculating...')
+      printMsg('Calculating... This can take a long time for large datasets...')
       arcpy.CalculateField_management (ToTab, fld, expression, 'PYTHON', codeblock)
       printMsg('"%s" field done.' %fld)
    return ToTab

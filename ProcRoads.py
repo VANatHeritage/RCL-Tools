@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2017-12-05
+# Last Edit: 2017-12-06
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -284,9 +284,11 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
       printMsg('Field %s added.' % f.Name)
    
    # Join fields from VDOT table
-   printMsg('Joining attributes from VDOT table')
+   printMsg('Joining attributes from VDOT table. This could take hours...')
    vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
-   JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   #JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   #My JoinFields function failed to finish after ~24 hours, so I reverted to using arcpy.JoinField.
+   arcpy.JoinField_management(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
    
    # Calculate flag field
    printMsg('Calculating flag field')
@@ -482,11 +484,11 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
 def main():
    # Set up your variables here
    inRCL = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VA_CENTERLINE'
-   outRCL = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_subset'
+   outRCL = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_subset_20171206'
    inVDOT = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VDOT_ATTRIBUTE'
    
    # Include the desired function run statement(s) below
-   # ExtractRCL_su(inRCL, outRCL)
+   ExtractRCL_su(inRCL, outRCL)
    PrepRoadsVA_su(outRCL, inVDOT)
    
    # End of user input
