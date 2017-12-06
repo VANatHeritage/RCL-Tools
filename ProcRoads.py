@@ -14,9 +14,11 @@
 # - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
 # - MergeRoads_tt (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
 # 
-# The following functions are helper functions called by the above functions:
-# - printMsg (shortcut for informative progress messaging)
-# - ProjectToMatch (to project one dataset to match the coordinate system of another)
+# Use the following function sequence to generate road surfaces from road centerlines:
+# - ExtractRCL_su (to extract the relevant road segments for which you want surfaces generated)
+# - PrepRoadsVA_su (to add necessary fields to roads data)
+# - AssignBuffer_su (to assign road surface buffer widths)
+# - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
 # ---------------------------------------------------------------------------
 
 # Import Helper module and functions
@@ -317,7 +319,7 @@ def AssignBuffer_su(inRCL):
 
 The codeblock used to assign buffer widths is based on information here:
 https://nacto.org/docs/usdg/geometric_design_highways_and_streets_aashto.pdf. 
-See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled way and shoulders for different road types and capacities. Relevant pages: 388,429,452, 476-478, 507-509. There's some seriously scintillating bedtime reading right here <snark>.
+See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled way and shoulders for different road types and capacities. Relevant pages: 388,429,452, 476-478, 507-509.
 
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
