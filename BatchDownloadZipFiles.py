@@ -2,7 +2,7 @@
 # BatchDownloadZipFiles.py
 # Version:  Python 2.7.5
 # Creation Date: 2015-07-14
-# Last Edit: 2017-11-13
+# Last Edit: 2018-05-29
 # Creator:  Kirsten R. Hazler
 # Credits:  I adapted the FTP-related procedures from code provided by Adam Thom, here:  
 # https://gis.stackexchange.com/questions/59047/downloading-multiple-files-from-tiger-ftp-site/
@@ -52,7 +52,7 @@ import gc # garbage collection
 import datetime # for time stamps
 from datetime import datetime
 
-def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = ''):
+def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = '', extract = True):
    '''Downloads a set of zip files from an FTP site.  
       The file set is determined by a list in a user-provided CSV file, which is assumed to have a header row containing field names.
    in_tab = Table (in CSV format) containing unique ID field for the files to retrieve
@@ -76,7 +76,7 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
    ProcList = list() # List to hold processing results
 
    # Make a list of the files to download, from the input table
-   print 'Reading CSV table...'
+   print 'Reading table...'
    try:
       with open(in_tab, 'r' ) as theFile:
          reader = csv.DictReader(theFile)
@@ -84,7 +84,6 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
             fname = pre + row[in_fld] + suf
             FileList.append(fname)
    except:
-      arcpy.AddError('Unable to parse input table.  Exiting...')
       Log.write('Unable to parse input table.  Exiting...')
       exit()
 
@@ -127,7 +126,6 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
             ftp.retrbinary('RETR '+ fileName, local_file.write)
          ProcList.append('Successfully downloaded %s' % fileName)
       except:
-         arcpy.AddWarning('Failed to download %s ...' % fileName)
          ProcList.append('Failed to download %s' % fileName)
 
    # Write download results to log.
@@ -137,6 +135,14 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
    timestamp = datetime.now().strftime(FORMAT)
    Log.write("\nProcess logging ended %s" % timestamp)   
    Log.close()
+   
+   if extract:
+      try:
+         import BatchExtractZipFiles
+         BatchExtractZipFiles.BatchExtractZipFiles(out_dir, out_dir + os.sep + 'unzip')
+         print 'All files extracted.'
+      except:
+         print 'Error unzipping files.'
 
    return
    
@@ -146,16 +152,17 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
 def main():
    # Set up variables 
    # The following are for TIGER/Line roads data
-   in_tab = r'C:\Testing\ConsVisionRecMod\Cty_50miBuff.txt'
+   in_tab = r'C:\David\scratch\roads-test\nonVAcounties.txt'
    in_fld = 'GEOID' #(5-digit code for state/county)
-   out_dir = r'H:\Backups\GIS_Data_VA\TIGER\ROADS\CountyDownloads2017'
+   out_dir = r'C:\David\scratch\roads-test\nonVAcounties'
    ftpHOST = 'ftp2.census.gov'
    ftpDIR = 'geo/tiger/TIGER2017/ROADS'
    pre = 'tl_2017_' 
    suf = '_roads.zip' 
+   extract = True
    
    # Specify function to run
-   BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre, suf)
+   BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre, suf, extract)
 
 if __name__ == '__main__':
    main()

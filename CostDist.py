@@ -37,8 +37,8 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
    
    # Environment settings
    arcpy.env.snapRaster = snpRast
-   arcpy.env.mask = snpRast
-   arcpy.env.extent = snpRast
+   # arcpy.env.mask = snpRast    # masking not desirable if long bridges will get masked out over water
+   arcpy.env.extent = inRoads # extent should be based on input roads; raster is just for snapping
    
    # Ensure inputs are in same coordinate system
    printMsg('Checking coordinate systems of inputs...')
@@ -70,9 +70,9 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
    # Set up your variables here
-   inRoads = r'C:\Testing\RCL_Test.gdb\RCL2017Q3_Subset_prj'
-   snpRast = r'C:\Testing\RCL_Test.gdb\costDist'
-   outCostSurf = r'C:\Testing\costSurf.tif'
+   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset_only_lah'
+   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
+   outCostSurf = r'C:\David\projects\va_cost_surface\cost_surfaces\costSurf_only_lah.tif'
    
    # Include the desired function run statement(s) below
    CostSurfTravTime(inRoads, snpRast, outCostSurf)

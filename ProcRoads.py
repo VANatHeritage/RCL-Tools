@@ -118,7 +118,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
-def PrepRoadsTIGER_tt(inList, inBnd, outRoads):
+def PrepRoadsTIGER_tt(inDir, inBnd, outRoads):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
 - MTFCC
 - RTTYP
@@ -127,6 +127,9 @@ If any of the assumed fields do not exist, have been renamed, or are in the wron
 This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # Process: Merge all roads
+   arcpy.env.workspace = inDir
+   inList = arcpy.ListFeatureClasses()
+         
    printMsg("Merging TIGER roads datasets...")
    mergeRds = scratchGDB + os.sep + "mergeRds"
    arcpy.Merge_management(inList, mergeRds)
@@ -144,23 +147,23 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Adding and populating 'SPEED_upd' field...")
    arcpy.AddField_management(outRoads, "Speed_upd", "LONG")
    codeblock = """def Speed(mtfcc, rttyp):
-   if mtfcc == 'S1100' and rttyp == 'I':
-      return 65
-   elif mtfcc == 'S1100' and rttyp != 'I':
-      return 55
-   elif mtfcc in ['S1200', 'S1300', 'S1640']:
-      return 45
-   elif mtfcc == 'S1630':
-      return 30
-   elif mtfcc in ['C3061', 'C3062', 'S1400', 'S1740']:
-      return 25
-   elif mtfcc in ['S1500', 'S1730', 'S1780']:
-      return 15
-   elif mtfcc == 'S1820':
-      return 10
-   else:  
-      return 3"""
-   expression = "Speed(!MTFCC!,!RTTYP! )"
+      if mtfcc == 'S1100' and rttyp == 'I':
+         return 65
+      elif mtfcc == 'S1100' and rttyp != 'I':
+         return 55
+      elif mtfcc in ['S1200', 'S1300', 'S1640']:
+         return 45
+      elif mtfcc == 'S1630':
+         return 30
+      elif mtfcc in ['C3061', 'C3062', 'S1400', 'S1740']:
+         return 25
+      elif mtfcc in ['S1500', 'S1730', 'S1780']:
+         return 15
+      elif mtfcc == 'S1820':
+         return 10
+      else:  
+         return 3"""
+   expression = "Speed(!MTFCC!,!RTTYP!)"
    arcpy.CalculateField_management(outRoads, "SPEED_upd", expression, "PYTHON_9.3",codeblock)
 
    # Process: Create and calculate "TravTime" field
@@ -211,7 +214,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    
    # Create the field mapping
    printMsg("Creating field mappings...")
-   inFlds = ['TravTime', 'UniqueID', 'RmpHwy', 'Speed_upd']
+   inFlds = ['TravTime', 'UniqueID', 'RmpHwy', 'Speed_upd','MTFCC']
    fldMappings = arcpy.FieldMappings()
    for fld in inFlds:
       fldMap = arcpy.FieldMap()
@@ -236,7 +239,7 @@ Excludes the following MTFCC types:
 - S9999: Driveways
 - S1710: Walkways/Pedestrian Trails
 - S1720: Stairways
-- S1740: Service Vehicle Private Drves
+- S1740: Service Vehicle Private Drives
 - S1820: Bike Paths or Trails
 - S1830: Bridle Paths
 - S1500: 4WD Vehicular Trails
@@ -492,17 +495,76 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 
+# Usage tips:
+# Use the following function sequence to prepare roads for travel time analysis:
+# - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
+# - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
+# - MergeRoads_tt (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
+# 
+# Use the following function sequence to generate road surfaces from road centerlines:
+# - ExtractRCL_su (to extract the relevant road segments for which you want surfaces generated)
+# - PrepRoadsVA_su (to add necessary fields to roads data)
+# - AssignBuffer_su (to assign road surface buffer widths)
+# - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
+
 def main():
    # Set up your variables here
-   inRCL = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VA_CENTERLINE'
-   outRCL = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_subset_20171206'
-   inVDOT = r'H:\Backups\GIS_Data_VA\VGIN\RCL\CurrentData\RCL_2017Q3\Virginia_RCL_Dataset_2017Q3.gdb\VDOT_ATTRIBUTE'
-   outSurfaces = r'C:\Users\xch43889\Documents\Working\RCL\RCL_Proc.gdb\RCL_surfaces_20171206'
+   outRCL = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529'
+   inVDOT = r'C:\David\projects\va_cost_surface\roads\VA\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
+   outSurfaces = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529\RCL_surfaces'
+   
+   # tt prep
+   # first create a new processing database: C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb
+   # NOTE: I had to copy VA_CENTERLINE from the original source gdb to the prep_roads.gdb in order to use it (this also copied associated tables). 
+   # It couldn't be edited in the original, and copying just VA_CENTERLINE by itself altered the column names of the table 
+   
+   # non-VA roads 
+   inDir = r'C:/David/projects/va_cost_surface/roads/nonVAcounties/unzip' # all non-VA roads shapefiles
+   inBnd = r'C:/David/projects/va_cost_surface/roads_proc/va_boundary_50km.shp'
+   outRoads = r'C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb/non_VA_centerline'
+   PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
+
+   # VA roads
+   arcpy.env.workspace = r'C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb'
+   inRCL = r'VA_CENTERLINE'
+   # note the following step can take many hours to complete
+   PrepRoadsVA_tt(inRCL)
+   
+   # extract subsets
+   inRCL = 'va_centerline'
+   outRCL = 'va_subset'
+   # note: excludes pedestrian/private road types, and ferry routes. Left in over/underpasses, since these couldn't be removed from non-VA
+   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (50)"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   inRCL = 'non_VA_centerline'
+   outRCL = 'non_va_subset'
+   # note: excludes pedestrian/private road types. 
+   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' )"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   # now merge the subsets
+   inList = [r'va_subset',r'non_va_subset']
+   outRoads = r'all_subset'
+   # now merge
+   MergeRoads_tt(inList, outRoads)
+   
+   # now also export a layer excluding ramps/limited access highways)
+   inRCL = 'all_subset'
+   outRCL = 'all_subset_no_lah'
+   where_clause = "RmpHwy = 0"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   # now also export a layer including ONLY ramps/limited access highways)
+   inRCL = 'all_subset'
+   outRCL = 'all_subset_only_lah'
+   where_clause = "RmpHwy <> 0"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # Include the desired function run statement(s) below
-   #ExtractRCL_su(inRCL, outRCL)
-   #PrepRoadsVA_su(outRCL, inVDOT)
-   #AssignBuffer_su(outRCL)
+   # Did not run
+   PrepRoadsVA_su(outRCL, inVDOT)
+   AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces)
 
    
