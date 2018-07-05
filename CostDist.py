@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-10-24
+# Last Edit: 2018-06-28
 
 # Summary:
 # A collection of functions for running cost distance analysis based on road speeds.
@@ -23,13 +23,14 @@
 import Helper
 from Helper import *
 
-def CostSurfTravTime(inRoads, snpRast, outCostSurf, valFld = "TravTime", priFld = "Speed_upd"):
+def CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = False, valFld = "TravTime", priFld = "Speed_upd"):
    """Creates a cost surface from road segments based on the TravTime field, which represents time, in minutes, to travel 1 meter at the posted road speed. Areas with no roads are assumed to allow walking speed of 3 miles/hour, equivalent to a TravTime value of  0.01233.
    
 Parameters:
 - inRoads: Input roads feature class. This should have been produced by running the sequence of functions in the ProcRoads.py module.
 - snpRast: A raster used as a processing mask and to set cell size and alignment. This could be an NLCD raster resampled to 5-m cells, for example.
-- outRast: The output raster dataset.
+- outCostSurf: The output raster dataset.
+- lahOnly: Boolean, default value is False. If True, the background value is NoData; if False, it is set to a walking speed value.
 - valFld: The field used to set the output raster values. The default field is "TravTime".
 - priFld: The priority field, used to determine which road segment to use to assign cell values in cases of conflict. The default field is "Speed_upd".
 
@@ -52,8 +53,12 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
    
    # Set time costs for non-roads to finalize cost surface
    printMsg('Creating final cost surface...')
-   cs = Con(IsNull(tmpRast), 0.01233, tmpRast)
-   cs.save(outCostSurf)
+   if lahOnly:
+      # lahOnly has only highways/ramps, so no background value is needed
+      arcpy.CopyRaster_management(tmpRast, outCostSurf)
+   else:
+      cs = Con(IsNull(tmpRast), 0.01233, tmpRast)
+      cs.save(outCostSurf)
    
    # Cleanup
    try:
@@ -69,15 +74,26 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
-   # Set up your variables here
+   # all roads cost surface
+   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset'
+   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
+   outCostSurf = r'C:\David\projects\va_cost_surface\cost_surfaces\costSurf_all.tif'
+
+   CostSurfTravTime(inRoads, snpRast, outCostSurf)
+   
+   # LAH cost surface
    inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset_only_lah'
    snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
    outCostSurf = r'C:\David\projects\va_cost_surface\cost_surfaces\costSurf_only_lah.tif'
+
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, True)
    
-   # Include the desired function run statement(s) below
+   # no LAH cost surface
+   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset_no_lah'
+   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
+   outCostSurf = r'C:\David\projects\va_cost_surface\cost_surfaces\costSurf_no_lah.tif'
+
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
-   
-   # End of user input
    
 if __name__ == '__main__':
    main()

@@ -62,7 +62,7 @@ def BatchExtractZipFiles(ZipDir, OutDir):
 
 ##################################################################################################################
 # Use the main function below to run a function directly from Python IDE or command line with hard-coded variables
-# Note that this is built-in to BatchDownloadZipFiles (when extract = True), so by default, running this function below is commented out
+# Note that this is built-in to BatchDownloadZipFiles (when extract = True), so by default, running this function here is commented out
 
 #def main():
 #   # Set up variables 

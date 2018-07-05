@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2017-12-06
+# Last Edit: 2018-06-28
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -514,26 +514,28 @@ def main():
    outSurfaces = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529\RCL_surfaces'
    
    # tt prep
-   # first create a new processing database: C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb
+   # first create a new processing database: C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb
    # NOTE: I had to copy VA_CENTERLINE from the original source gdb to the prep_roads.gdb in order to use it (this also copied associated tables). 
    # It couldn't be edited in the original, and copying just VA_CENTERLINE by itself altered the column names of the table 
    
    # non-VA roads 
-   inDir = r'C:/David/projects/va_cost_surface/roads/nonVAcounties/unzip' # all non-VA roads shapefiles
-   inBnd = r'C:/David/projects/va_cost_surface/roads_proc/va_boundary_50km.shp'
-   outRoads = r'C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb/non_VA_centerline'
+   inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
+   inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
+   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\non_VA_centerline'
+   # NOTE - Manually added Tazewell county, VA to this non-VA file due to issues with the roads in that county in the VA_CENTERLINE dataset (Q1 2018)
    PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
 
    # VA roads
-   arcpy.env.workspace = r'C:/David/projects/va_cost_surface/roads_proc/prep_roads/prep_roads.gdb'
+   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
    inRCL = r'VA_CENTERLINE'
    # note the following step can take many hours to complete
    PrepRoadsVA_tt(inRCL)
    
    # extract subsets
+   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
    inRCL = 'va_centerline'
    outRCL = 'va_subset'
-   # note: excludes pedestrian/private road types, and ferry routes. Left in over/underpasses, since these couldn't be removed from non-VA
+   # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (50)"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
@@ -549,24 +551,24 @@ def main():
    # now merge
    MergeRoads_tt(inList, outRoads)
    
-   # now also export a layer excluding ramps/limited access highways)
+   # now also export a layer excluding limited access highways (RmpHwy = 2))
+   # these are "Local roads" (includes all ramps)
    inRCL = 'all_subset'
    outRCL = 'all_subset_no_lah'
-   where_clause = "RmpHwy = 0"
+   where_clause = "RmpHwy <> 2"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # now also export a layer including ONLY ramps/limited access highways)
+   # a GIS process was used to select points of access (local roads intersecting ramps that lead to LAH) onto to this LAH network
    inRCL = 'all_subset'
    outRCL = 'all_subset_only_lah'
    where_clause = "RmpHwy <> 0"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # Include the desired function run statement(s) below
-   # Did not run
-   PrepRoadsVA_su(outRCL, inVDOT)
-   AssignBuffer_su(outRCL)
-   CreateRoadSurfaces_su(outRCL, outSurfaces)
-
+   # PrepRoadsVA_su(outRCL, inVDOT)
+   # AssignBuffer_su(outRCL)
+   # CreateRoadSurfaces_su(outRCL, outSurfaces)
    
    # End of user input
    
