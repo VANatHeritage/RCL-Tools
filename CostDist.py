@@ -74,6 +74,7 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
+   scratchGDB = r'C:\David\scratch\roads.gdb'
    # all roads cost surface
    inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset'
    snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'

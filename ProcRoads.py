@@ -39,7 +39,6 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    # This field can be used to store QC comments related to speed, if needed.
    printMsg("Adding 'SPEED_cmt' field...")
    arcpy.AddField_management (inRCL, "SPEED_cmnt", "TEXT", "", "", 50)
-   
    # Process: Create and calculate "FlgFld"
    # This field is used to flag records with suspect LOCAL_SPEED_MPH values
    # 1 = Flagged: need to update speed based on MTFCC field
@@ -48,15 +47,13 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Adding and populating 'FlgFld' field...")
    arcpy.AddField_management(inRCL, "FlgFld", "LONG")
    codeblock = """def Flg (exists, speed):
-      if exists == "Y":
-         if (speed == 0):
-            return 1
-         elif (speed % 5 != 0):
+      if exists == "N":
+         return -1
+      else:
+         if not speed or speed == 0 or speed % 5 != 0:
             return 1
          else:
-            return 0
-      else:
-         return -1"""
+            return 0"""
    expression = "Flg(!SEGMENT_EXISTS!,!LOCAL_SPEED_MPH!)"
    arcpy.CalculateField_management(inRCL, "FlgFld", expression, "PYTHON_9.3", codeblock)
 
@@ -66,9 +63,9 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    arcpy.AddField_management(inRCL, "SPEED_upd", "LONG")
    codeblock = """def SpdUpd(flgfld, mtfcc, speed):
       if flgfld == 1:
-         if mtfcc == 'S1100':
+         if mtfcc in ['S1100','S1100HOV']:
             return 55
-         elif mtfcc in ['S1200', 'S1300', 'S1640']:
+         elif mtfcc in ['S1200','S1200LOC','S1200PRI','S1300', 'S1640']:
             return 45
          elif mtfcc == 'S1630':
             return 30
@@ -509,20 +506,19 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
 def main():
    # Set up your variables here
-   outRCL = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529'
-   inVDOT = r'C:\David\projects\va_cost_surface\roads\VA\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
-   outSurfaces = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529\RCL_surfaces'
+   # outRCL = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529'
+   # inVDOT = r'C:\David\projects\va_cost_surface\roads\VA\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
+   # outSurfaces = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529\RCL_surfaces'
    
    # tt prep
    # first create a new processing database: C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb
    # NOTE: I had to copy VA_CENTERLINE from the original source gdb to the prep_roads.gdb in order to use it (this also copied associated tables). 
-   # It couldn't be edited in the original, and copying just VA_CENTERLINE by itself altered the column names of the table 
    
+   scratchGDB = r'C:\David\scratch\roads.gdb'
    # non-VA roads 
    inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
    inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
-   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\non_VA_centerline'
-   # NOTE - Manually added Tazewell county, VA to this non-VA file due to issues with the roads in that county in the VA_CENTERLINE dataset (Q1 2018)
+   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\non_va_centerline'
    PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
 
    # VA roads
@@ -533,16 +529,16 @@ def main():
    
    # extract subsets
    arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
-   inRCL = 'va_centerline'
+   inRCL = 'VA_CENTERLINE'
    outRCL = 'va_subset'
    # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
-   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (50)"
+   where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   inRCL = 'non_VA_centerline'
+   inRCL = 'non_va_centerline'
    outRCL = 'non_va_subset'
-   # note: excludes pedestrian/private road types. 
-   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' )"
+   # note: excludes pedestrian/private road types, internal census use (S1750)
+   where_clause = "MTFCC NOT IN ('S1730', 'S1750', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500')"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # now merge the subsets
