@@ -505,29 +505,29 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
 
 def main():
-   # Set up your variables here
-   # outRCL = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529'
-   # inVDOT = r'C:\David\projects\va_cost_surface\roads\VA\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
-   # outSurfaces = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\RCL_subset_20180529\RCL_surfaces'
    
-   # tt prep
+   # Creating road subset with speed attribute for travel time analysis
+   
    # first create a new processing database: C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb
-   # NOTE: I had to copy VA_CENTERLINE from the original source gdb to the prep_roads.gdb in order to use it (this also copied associated tables). 
+   # NOTE: I copied VA_CENTERLINE from the original source gdb to 
+   # a new geodatabase (prep_roads.gdb) in order to use it, since
+   # it could not be edited in the original gdb.
    
+   # set a scratch GDB for the session
    scratchGDB = r'C:\David\scratch\roads.gdb'
-   # non-VA roads 
+   # process Tiger (non-VA) roads
    inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
    inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
    outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\non_va_centerline'
    PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
 
-   # VA roads
+   # process VA roads
    arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
    inRCL = r'VA_CENTERLINE'
-   # note the following step can take many hours to complete
+   # note the following step can take hours to complete
    PrepRoadsVA_tt(inRCL)
    
-   # extract subsets
+   # extract subsets based on MTFCC
    arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
    inRCL = 'VA_CENTERLINE'
    outRCL = 'va_subset'
@@ -547,19 +547,25 @@ def main():
    # now merge
    MergeRoads_tt(inList, outRoads)
    
-   # now also export a layer excluding limited access highways (RmpHwy = 2))
-   # these are "Local roads" (includes all ramps)
+   # now export a layer excluding limited access highways (RmpHwy = 2))
    inRCL = 'all_subset'
    outRCL = 'all_subset_no_lah'
    where_clause = "RmpHwy <> 2"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   # now also export a layer including ONLY ramps/limited access highways)
-   # a GIS process was used to select points of access (local roads intersecting ramps that lead to LAH) onto to this LAH network
+   # now export a layer with ONLY ramps/limited access highways)
    inRCL = 'all_subset'
    outRCL = 'all_subset_only_lah'
    where_clause = "RmpHwy <> 0"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   
+   # Road surface layer creation
+   
+   # Set up your variables here
+   # outRCL = r'\outputpath\RCL_subset_20180529'
+   # inVDOT = r'path\to\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
+   # outSurfaces = r'outputpath\RCL_subset_20180529\RCL_surfaces'
    
    # Include the desired function run statement(s) below
    # PrepRoadsVA_su(outRCL, inVDOT)
