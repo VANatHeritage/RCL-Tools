@@ -508,9 +508,9 @@ def main():
    
    # Creating road subset with speed attribute for travel time analysis
    
-   # first create a new processing database: C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb
+   # first create a new processing database: ...\prep_roads.gdb
    # NOTE: I copied VA_CENTERLINE from the original source gdb to 
-   # a new geodatabase (prep_roads.gdb) in order to use it, since
+   # this new geodatabase (prep_roads.gdb) in order to use it, since
    # it could not be edited in the original gdb.
    
    # set a scratch GDB for the session
