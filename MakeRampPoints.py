@@ -16,13 +16,13 @@ from Helper import *
 import arcpy
 
 # create new geodatabase
-arcpy.CreateFileGDB_management(r'C:\David\projects\va_cost_surface\rmpts','rmpt_test2.gdb')
-wd = r'C:\David\projects\va_cost_surface\rmpts\rmpt_test2.gdb'
+arcpy.CreateFileGDB_management(r'C:\David\projects\va_cost_surface\rmpts','rmpt_2018Q3.gdb')
+wd = r'C:\David\projects\va_cost_surface\rmpts\rmpt_2018Q3.gdb'
 
 # path to Limited access highways
-lah = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset_only_lah'
+lah = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_only_lah'
 # path to layer excluding limited access highways
-local = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\all_subset_no_lah'
+local = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_no_lah'
 
 # make LAH, ramp layers to work with
 arcpy.env.workspace = wd
@@ -40,21 +40,40 @@ a = 0
 b = 1
 while a != b:
    a = int(arcpy.GetCount_management(cur)[0])
-   print('start = ' + str(a))
    arcpy.SelectLayerByLocation_management(base,"BOUNDARY_TOUCHES",cur,"#","ADD_TO_SELECTION")
    cur = arcpy.MakeFeatureLayer_management(base, "cur")
    b = int(arcpy.GetCount_management(cur)[0])
    print('end = ' + str(b))
 
-# create all endpoints of ramps
+# create all endpoints of selected ramps
 arcpy.FeatureVerticesToPoints_management(cur,"rmpt1","BOTH_ENDS")
 rmpt1 = arcpy.MakeFeatureLayer_management("rmpt1")
 
-# select only ramp endpoints intersecting local roads, save as rmpt2
+# get local roads only from local (remove ramps)
 arcpy.Select_analysis(local,"loc",'RmpHwy <> 1')
+loc = arcpy.MakeFeatureLayer_management("loc")
 
+# select only ramp endpoints intersecting local roads, save as rmpt2
 arcpy.SelectLayerByLocation_management(rmpt1,"INTERSECT","loc")
 arcpy.CopyFeatures_management(rmpt1,"rmpt2")
+
+
+## get "dead end" hwy points (transition from LAH to local road without ramp) points
+arcpy.Select_analysis(lah,'hwy_end','RmpHwy = 2')
+arcpy.Dissolve_management('hwy_end','hwy_end_diss',"#", "#", "SINGLE_PART","UNSPLIT_LINES")
+arcpy.FeatureVerticesToPoints_management("hwy_end_diss","he1","BOTH_ENDS")
+he1 = arcpy.MakeFeatureLayer_management("he1")
+rmp = arcpy.MakeFeatureLayer_management("rmp")
+
+# select local roads intersecting lah
+arcpy.SelectLayerByLocation_management(loc,"INTERSECT","hwy_end_diss")
+# now select highway end points intersecting those roads
+arcpy.SelectLayerByLocation_management(he1, "INTERSECT", loc)
+# now remove those intersecting ramps
+arcpy.SelectLayerByLocation_management(he1, "INTERSECT", "rmp", "#", "REMOVE_FROM_SELECTION")
+arcpy.CopyFeatures_management(he1, "hwy_endpts")
+arcpy.AddField_management("hwy_endpts", "UniqueID", "TEXT")
+arcpy.CalculateField_management("hwy_endpts", "UniqueID", "'HWYEND_' + str(int(!OBJECTID!))",  "PYTHON_9.3")
 
 """
 TIGER/Line fix.
@@ -82,16 +101,19 @@ arcpy.SelectLayerByAttribute_management(base, "REMOVE_FROM_SELECTION", "UniqueID
 # from these, find intersection points with local roads, then export as single-part
 arcpy.Intersect_analysis([base,"loc"], 'rmpt2_nonVAfix1', "ONLY_FID", "#", "POINT")
 arcpy.MultipartToSinglepart_management('rmpt2_nonVAfix1', 'rmpt2_nonVAfix2')
+arcpy.AddField_management("rmpt2_nonVAfix2", "UniqueID", "TEXT")
+arcpy.CalculateField_management("rmpt2_nonVAfix2", "UniqueID", "'NONVAFIX_' + str(int(!FID_rmp!))",  "PYTHON_9.3")
 
-# clean up
-garbagePickup(['loc','hwy','rmp'])
 
 # NOTE:
 # in a previous run-through, some points in the non-VA fix were on ramps that overpass local roads,
 # not actually connecting with them. The layer 'rmpt2_nonVAfix2' should be reviewed and those
-# points manually deleted prior to merging into the final layer ('rmpt3')
+# points manually deleted prior to merging into the final layer below ('rmpt_final')
 
-# merge datasets into final ramp points layer
-arcpy.Merge_management(["rmpt2","rmpt2_nonVAfix2"],"rmpt3")
+# merge all datasets into final ramp points layer
+arcpy.Merge_management(["rmpt2","rmpt2_nonVAfix2","hwy_endpts"],"rmpt_final")
+
+# clean up
+garbagePickup(['loc','hwy','rmp','he1','hwy_end','hwy_end_diss'])
 
 # end

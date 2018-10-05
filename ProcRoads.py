@@ -515,20 +515,26 @@ def main():
    
    # set a scratch GDB for the session
    scratchGDB = r'C:\David\scratch\roads.gdb'
-   # process Tiger (non-VA) roads
-   inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
-   inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
-   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb\non_va_centerline'
-   PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
-
+   
    # process VA roads
-   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
+   orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
+   wd = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
+   arcpy.env.workspace = wd
+   # new FC to create
    inRCL = r'VA_CENTERLINE'
+   # copy original FC to working GDB
+   arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + inRCL)
    # note the following step can take hours to complete
    PrepRoadsVA_tt(inRCL)
    
+   # process Tiger (non-VA) roads
+   inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
+   inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
+   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\non_va_centerline'
+   PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
+   
    # extract subsets based on MTFCC
-   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads.gdb'
+   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
    inRCL = 'VA_CENTERLINE'
    outRCL = 'va_subset'
    # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
