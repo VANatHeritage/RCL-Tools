@@ -115,7 +115,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
-def PrepRoadsTIGER_tt(inDir, inBnd, outRoads):
+def PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas = None):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
 - MTFCC
 - RTTYP
@@ -125,43 +125,87 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
 
    # Process: Merge all roads
    arcpy.env.workspace = inDir
+   arcpy.env.outputCoordinateSystem = inBnd # this should make projection unnecessary
    inList = arcpy.ListFeatureClasses()
          
    printMsg("Merging TIGER roads datasets...")
    mergeRds = scratchGDB + os.sep + "mergeRds"
-   arcpy.Merge_management(inList, mergeRds)
+   prjRds = arcpy.Merge_management(inList, mergeRds)
    
    # Process: Project the merged roads to match the input boundary
-   printMsg("Re-projecting roads to match boundary...")
-   prjRds = ProjectToMatch(mergeRds, inBnd)
+   #printMsg("Re-projecting roads to match boundary...")
+   #prjRds = ProjectToMatch(mergeRds, inBnd)
    
    # Process: Clip to boundary
    printMsg("Clipping roads to boundary...")
    arcpy.Clip_analysis(prjRds, inBnd, outRoads)
    
    # Process: Create and calculate "SPEED_upd" field.
-   # This field is used to store speed values to be used in later processing. It allows for altering speed values according to QC criteria, without altering original values in the  existing "LOCAL_SPEED_MPH" field. 
-   printMsg("Adding and populating 'SPEED_upd' field...")
+   # This field is used to store speed values to be used in later processing. It allows for altering speed values according to QC criteria
+   printMsg("Adding and populating 'Speed_upd' field...")
    arcpy.AddField_management(outRoads, "Speed_upd", "LONG")
    codeblock = """def Speed(mtfcc, rttyp):
-      if mtfcc == 'S1100' and rttyp == 'I':
-         return 65
-      elif mtfcc == 'S1100' and rttyp != 'I':
-         return 55
-      elif mtfcc in ['S1200', 'S1300', 'S1640']:
-         return 45
+      if mtfcc == 'S1100':
+         if rttyp == 'I':
+            return 70
+         else:
+            return 55
+      elif mtfcc in ['S1200', 'S1640']:
+         # secondary roads (not limited access)
+         if rttyp in ['I','S','U']:
+            # interstates, state roads, u.s. roads
+            return 55
+         else:
+            return 45
       elif mtfcc == 'S1630':
+         # ramps
          return 30
       elif mtfcc in ['C3061', 'C3062', 'S1400', 'S1740']:
+         # residential/other roads
          return 25
       elif mtfcc in ['S1500', 'S1730', 'S1780']:
+         # 4WD, alleys, and parking lots
          return 15
       elif mtfcc == 'S1820':
+         # bike path
          return 10
       else:  
          return 3"""
    expression = "Speed(!MTFCC!,!RTTYP!)"
-   arcpy.CalculateField_management(outRoads, "SPEED_upd", expression, "PYTHON_9.3",codeblock)
+   arcpy.CalculateField_management(outRoads, "Speed_upd", expression, "PYTHON_9.3",codeblock)
+   
+   # reduce speeds by 10 mph for road segments intersecting urban areas
+   if urbAreas:
+      printMsg("Adjusting speeds in urban areas...")
+      noUrb = arcpy.Erase_analysis(outRoads, urbAreas, scratchGDB + os.sep + "noUrb")
+      onlyUrb = arcpy.Clip_analysis(outRoads, urbAreas, scratchGDB + os.sep + "onlyUrb")
+      codeblock = """def Speed(Speed_upd):
+         if Speed_upd > 30:
+            return Speed_upd - 10
+         else:
+            return Speed_upd"""
+      expression = "Speed(!Speed_upd!)"
+      arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON_9.3",codeblock)
+      outRoads = arcpy.Merge_management([noUrb, onlyUrb], outRoads + '_urbAdjust')
+      
+      #buff = arcpy.Buffer_analysis(urbAreas, "buff", "10 Meters", dissolve_option="ALL")
+      #buff2 = arcpy.PolygonToLine_management(buff)
+      #buffpt = arcpy.Intersect_analysis(outRoads, buff2)
+      #outRoadsSplit = arcpy.SplitLineAtPoint_management(outRoads, buffpt, outRoads + "_split")
+      #lyr = arcpy.MakeFeatureLayer_management(outRoadsSplit)
+      #urb = arcpy.MakeFeatureLayer_management(urbAreas)
+      #arcpy.SelectLayerByLocation_management(lyr, "INTERSECT", urb,"#", "NEW_SELECTION")
+      #codeblock = """def Speed(Speed_upd):
+      #   if Speed_upd > 30:
+      #      return Speed_upd - 10
+      #   else:
+      #      return Speed_upd"""
+      #expression = "Speed(!Speed_upd!)"
+      #arcpy.CalculateField_management(lyr, "Speed_upd", expression, "PYTHON_9.3",codeblock)
+      #arcpy.SelectLayerByAttribute_management(lyr, "CLEAR_SELECTION")
+      #garbagePickup([buff, buff2, buffpt])
+      #del [lyr,urb]
+      #outRoads = outRoadsSplit
 
    # Process: Create and calculate "TravTime" field
    # This field is used to store the travel time, in minutes, required to travel 1 meter, based on the road speed designation.
@@ -251,7 +295,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
    printMsg('Extracting relevant road segments and saving...')
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
-   printMsg('Roads exracted.')
+   printMsg('Roads extracted.')
    
    return outRCL
    
@@ -514,11 +558,11 @@ def main():
    # it could not be edited in the original gdb.
    
    # set a scratch GDB for the session
-   scratchGDB = r'C:\David\scratch\roads.gdb'
+   scratchGDB = "in_memory"
    
    # process VA roads
    orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
-   wd = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
+   wd = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb'
    arcpy.env.workspace = wd
    # new FC to create
    inRCL = r'VA_CENTERLINE'
@@ -528,24 +572,26 @@ def main():
    PrepRoadsVA_tt(inRCL)
    
    # process Tiger (non-VA) roads
-   inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
-   inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
-   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\non_va_centerline'
-   PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
+   inDir = r'F:\David\projects\RCL_processing\Tiger_2018\data\unzip' # all non-VA roads shapefiles
+   inBnd = r'F:\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
+   outRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline' # name used when processing Tiger-only
+   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph
+   PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas)
    
    # extract subsets based on MTFCC
-   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
+   arcpy.env.workspace = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb'
    inRCL = 'VA_CENTERLINE'
    outRCL = 'va_subset'
    # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
-   where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
+   where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   inRCL = 'non_va_centerline'
-   outRCL = 'non_va_subset'
+   #inRCL = 'all_centerline'
+   #outRCL = 'all_subset'
+   # This isn't necessary for costdist prep. All of these roads are assigned a walking speed already, so no need to exclude them
    # note: excludes pedestrian/private road types, internal census use (S1750)
-   where_clause = "MTFCC NOT IN ('S1730', 'S1750', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500')"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   #where_clause = "MTFCC NOT IN ('S1500','S1710', 'S1720','S1730','S1740','S1750','S1780', 'S9999','S1820','S1830')"
+   #arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # now merge the subsets
    inList = [r'va_subset',r'non_va_subset']
@@ -554,13 +600,14 @@ def main():
    MergeRoads_tt(inList, outRoads)
    
    # now export a layer excluding limited access highways (RmpHwy = 2))
-   inRCL = 'all_subset'
+   inRCL = 'all_centerline'
    outRCL = 'all_subset_no_lah'
    where_clause = "RmpHwy <> 2"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   # now export a layer with ONLY ramps/limited access highways)
-   inRCL = 'all_subset'
+   # now export a layer with ONLY ramps/limited access highways) 
+   # note that both subsets include ramps (RmpHwy = 1)
+   inRCL = 'all_centerline'
    outRCL = 'all_subset_only_lah'
    where_clause = "RmpHwy <> 0"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)

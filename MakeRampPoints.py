@@ -16,13 +16,15 @@ from Helper import *
 import arcpy
 
 # create new geodatabase
-arcpy.CreateFileGDB_management(r'C:\David\projects\va_cost_surface\rmpts','rmpt_2018Q3.gdb')
-wd = r'C:\David\projects\va_cost_surface\rmpts\rmpt_2018Q3.gdb'
+arcpy.CreateFileGDB_management(r'C:\David\projects\va_cost_surface\cost_surfaces\VA_RCL_2017Q3','rmpt.gdb')
+wd = r'C:\David\projects\va_cost_surface\cost_surfaces\VA_RCL_2017Q3\rmpt.gdb'
 
 # path to Limited access highways
-lah = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_only_lah'
+lah = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2017Q3.gdb\all_subset_only_lah'
 # path to layer excluding limited access highways
-local = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_no_lah'
+# local = r'F:\David\projects\RCL_processing\Tiger_2016\roads_proc.gdb\all_subset_no_lah'
+local = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2017Q3.gdb\all_subset_no_lah'
+## END VARIABLES
 
 # make LAH, ramp layers to work with
 arcpy.env.workspace = wd
@@ -57,7 +59,6 @@ loc = arcpy.MakeFeatureLayer_management("loc")
 arcpy.SelectLayerByLocation_management(rmpt1,"INTERSECT","loc")
 arcpy.CopyFeatures_management(rmpt1,"rmpt2")
 
-
 ## get "dead end" hwy points (transition from LAH to local road without ramp) points
 arcpy.Select_analysis(lah,'hwy_end','RmpHwy = 2')
 arcpy.Dissolve_management('hwy_end','hwy_end_diss',"#", "#", "SINGLE_PART","UNSPLIT_LINES")
@@ -71,16 +72,20 @@ arcpy.SelectLayerByLocation_management(loc,"INTERSECT","hwy_end_diss")
 arcpy.SelectLayerByLocation_management(he1, "INTERSECT", loc)
 # now remove those intersecting ramps
 arcpy.SelectLayerByLocation_management(he1, "INTERSECT", "rmp", "#", "REMOVE_FROM_SELECTION")
+
+# get highway endpoints (where they turn into local roads) 
 arcpy.CopyFeatures_management(he1, "hwy_endpts")
 arcpy.AddField_management("hwy_endpts", "UniqueID", "TEXT")
 arcpy.CalculateField_management("hwy_endpts", "UniqueID", "'HWYEND_' + str(int(!OBJECTID!))",  "PYTHON_9.3")
+
+# if not working with TIGER/line at all, this is the final dataset
+# arcpy.Merge_management(["rmpt2","hwy_endpts"],"rmpt_final")
 
 """
 TIGER/Line fix.
 
 Some ramps in the TIGER datasets do not have endpoints at local roads, even though they do connect to them.
 The following steps attempt to generate points for that subset of ramps. 
-If working with only the Virginia dataset, this section is not necessary, and 'rmpt2' is the final dataset.
 """
 
 # select ramps that touch LAH
@@ -95,8 +100,8 @@ arcpy.SelectLayerByLocation_management(rmpt2fix1,"INTERSECT","hwy", "#","NEW_SEL
 
 # un-select ramps intersecting points from above
 arcpy.SelectLayerByLocation_management(base,"INTERSECT",rmpt2fix1,"#","REMOVE_FROM_SELECTION")
-# remove ramps from Virginia dataset - this fix is only for Tiger datasets
-arcpy.SelectLayerByAttribute_management(base, "REMOVE_FROM_SELECTION", "UniqueID LIKE 'VA_%'")
+# remove ramps from Virginia dataset - this fix is only for Tiger datasets (if not using VA dataset, leave commented)
+# arcpy.SelectLayerByAttribute_management(base, "REMOVE_FROM_SELECTION", "UniqueID LIKE 'VA_%'")
 
 # from these, find intersection points with local roads, then export as single-part
 arcpy.Intersect_analysis([base,"loc"], 'rmpt2_nonVAfix1', "ONLY_FID", "#", "POINT")

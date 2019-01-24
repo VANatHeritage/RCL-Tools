@@ -152,12 +152,12 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
 def main():
    # Set up variables 
    # The following are for TIGER/Line roads data
-   in_tab = r'C:\David\scratch\roads-test\nonVAcounties.txt'
+   in_tab = r'F:\David\projects\RCL_processing\counties.txt'
    in_fld = 'GEOID' #(5-digit code for state/county)
-   out_dir = r'C:\David\scratch\roads-test\nonVAcounties'
+   out_dir = r'F:\David\projects\RCL_processing\Tiger_2018\data'
    ftpHOST = 'ftp2.census.gov'
-   ftpDIR = 'geo/tiger/TIGER2017/ROADS'
-   pre = 'tl_2017_' 
+   ftpDIR = 'geo/tiger/TIGER2018/ROADS'
+   pre = 'tl_2018_' 
    suf = '_roads.zip' 
    extract = True
    

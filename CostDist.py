@@ -74,25 +74,25 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
-   scratchGDB = r'C:\David\scratch\roads.gdb'
-   outFolder = r'C:\David\projects\va_cost_surface\cost_surfaces\VA_RCL_2018Q3'
-   # all roads cost surface
-   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset'
-   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
-   outCostSurf = outFolder  + '\costSurf_all_.tif'
+   scratchGDB = r'F:\David\projects\RCL_processing\scratch.gdb'
+   outFolder = r'F:\David\projects\RCL_processing\Tiger_2018\cost_surfaces'
+   # all roads cost surface (don't need this if using the two-step cost-distance approach)
+   # inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
+   # snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
+   # outCostSurf = outFolder  + '\costSurf_all_.tif'
 
-   CostSurfTravTime(inRoads, snpRast, outCostSurf)
+   # CostSurfTravTime(inRoads, snpRast, outCostSurf)
    
    # LAH-only cost surface
-   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_only_lah'
-   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
+   inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_subset_only_lah'
+   snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
    outCostSurf = outFolder  + '\costSurf_only_lah.tif'
 
    CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = True)
    
    # no-LAH cost surface
-   inRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\all_subset_no_lah'
-   snpRast = r'C:\David\projects\va_cost_surface\snap\Snap_VaLam30.tif'
+   inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_subset_no_lah'
+   snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
    outCostSurf = outFolder  + '\costSurf_no_lah.tif'
 
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
