@@ -74,26 +74,30 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
-   scratchGDB = r'F:\David\projects\RCL_processing\scratch.gdb'
-   outFolder = r'F:\David\projects\RCL_processing\Tiger_2018\cost_surfaces'
+   # set project folder and create new cost surfaces GDB
+   scratchGDB = "in_memory"
+   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+   outGDB = project + os.sep + 'cost_surfaces.gdb'
+   arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
+
+   # snap raster
+   snpRast = r'\\Ng00242727\f\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
+
    # all roads cost surface (don't need this if using the two-step cost-distance approach)
-   # inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
-   # snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
-   # outCostSurf = outFolder  + '\costSurf_all_.tif'
+   # inRoads = project + os.sep + 'roads_proc.gdb/all_centerline'
+   # outCostSurf = outGDB + os.sep + 'costSurf_all'
 
    # CostSurfTravTime(inRoads, snpRast, outCostSurf)
    
    # LAH-only cost surface
-   inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_subset_only_lah'
-   snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
-   outCostSurf = outFolder  + '\costSurf_only_lah.tif'
+   inRoads = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
+   outCostSurf = outGDB + os.sep + 'costSurf_only_lah'
 
    CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = True)
    
    # no-LAH cost surface
-   inRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_subset_no_lah'
-   snpRast = r'F:\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
-   outCostSurf = outFolder  + '\costSurf_no_lah.tif'
+   inRoads = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
+   outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
 
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
    

@@ -15,15 +15,14 @@ import Helper
 from Helper import *
 import arcpy
 
-# create new geodatabase
-arcpy.CreateFileGDB_management(r'C:\David\projects\va_cost_surface\cost_surfaces\VA_RCL_2017Q3','rmpt.gdb')
-wd = r'C:\David\projects\va_cost_surface\cost_surfaces\VA_RCL_2017Q3\rmpt.gdb'
+# working geodatabase for cost surfaces should have been created in CostDist.py
+project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+wd = project + os.sep + 'cost_surfaces.gdb'
 
 # path to Limited access highways
-lah = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2017Q3.gdb\all_subset_only_lah'
+lah = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
 # path to layer excluding limited access highways
-# local = r'F:\David\projects\RCL_processing\Tiger_2016\roads_proc.gdb\all_subset_no_lah'
-local = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2017Q3.gdb\all_subset_no_lah'
+local = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
 ## END VARIABLES
 
 # make LAH, ramp layers to work with
@@ -37,7 +36,7 @@ base = arcpy.MakeFeatureLayer_management("rmp")
 arcpy.SelectLayerByLocation_management(base, "INTERSECT", "hwy","#", "NEW_SELECTION")
 cur = arcpy.MakeFeatureLayer_management(base, "cur")
 
-# using selected ramp segements, add intersecting ramps until no new ramps are selected
+# using selected ramp segments, add intersecting ramps until no new ramps are selected
 a = 0
 b = 1
 while a != b:
@@ -57,6 +56,7 @@ loc = arcpy.MakeFeatureLayer_management("loc")
 
 # select only ramp endpoints intersecting local roads, save as rmpt2
 arcpy.SelectLayerByLocation_management(rmpt1,"INTERSECT","loc")
+# arcpy.SelectLayerByLocation_management(rmpt1,"WITHIN_A_DISTANCE","loc", "1 Meters") # use this? Doesn't seem to make much difference in 2011 data
 arcpy.CopyFeatures_management(rmpt1,"rmpt2")
 
 ## get "dead end" hwy points (transition from LAH to local road without ramp) points
@@ -119,6 +119,6 @@ arcpy.CalculateField_management("rmpt2_nonVAfix2", "UniqueID", "'NONVAFIX_' + st
 arcpy.Merge_management(["rmpt2","rmpt2_nonVAfix2","hwy_endpts"],"rmpt_final")
 
 # clean up
-garbagePickup(['loc','hwy','rmp','he1','hwy_end','hwy_end_diss'])
+garbagePickup(['loc','hwy','rmp','he1','hwy_end','hwy_end_diss','rmpt1','rmpt2_nonVAfix1','rmpt2fix1'])
 
 # end

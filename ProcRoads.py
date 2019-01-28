@@ -559,58 +559,65 @@ def main():
    
    # set a scratch GDB for the session
    scratchGDB = "in_memory"
-   
+
+   # set processing (project) folder name and output geodatabase
+   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+   wd = project + os.sep + 'roads_proc.gdb'
+   arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd)) # not necessary if already created
+
    # process VA roads
-   orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
-   wd = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb'
-   arcpy.env.workspace = wd
+   # orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
    # new FC to create
-   inRCL = r'VA_CENTERLINE'
+   # inRCL = r'VA_CENTERLINE'
    # copy original FC to working GDB
-   arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + inRCL)
+   # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + os.sep + inRCL)
    # note the following step can take hours to complete
-   PrepRoadsVA_tt(inRCL)
+   # PrepRoadsVA_tt(inRCL)
    
    # process Tiger (non-VA) roads
-   inDir = r'F:\David\projects\RCL_processing\Tiger_2018\data\unzip' # all non-VA roads shapefiles
-   inBnd = r'F:\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
-   outRoads = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline' # name used when processing Tiger-only
-   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph
+   inBnd = r'\\Ng00242727\f\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
+   inDir = project + '/data/unzip' # all non-VA roads shapefiles
+   outRoads = wd + os.sep + 'all_centerline' # name used when processing Tiger-only
+   urbAreas = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
    PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas)
-   
-   # extract subsets based on MTFCC
-   arcpy.env.workspace = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb'
-   inRCL = 'VA_CENTERLINE'
-   outRCL = 'va_subset'
+   # if manual editing for roads is needed, edit outRoads file
+
+   # Subset roads
+   arcpy.env.workspace = wd
+
+   # extract subsets for VA based on MTFCC
+   # inRCL = 'VA_CENTERLINE'
+   # outRCL = 'va_subset'
    # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
-   where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
-   
-   #inRCL = 'all_centerline'
-   #outRCL = 'all_subset'
+   # where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
+   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
+
+   # extract subset from non-VA (tiger)
+   inRCL = 'all_centerline_urbAdjust'
+   outRCL = 'all_subset'
    # This isn't necessary for costdist prep. All of these roads are assigned a walking speed already, so no need to exclude them
    # note: excludes pedestrian/private road types, internal census use (S1750)
-   #where_clause = "MTFCC NOT IN ('S1500','S1710', 'S1720','S1730','S1740','S1750','S1780', 'S9999','S1820','S1830')"
-   #arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   where_clause = "MTFCC NOT IN ('S1500','S1710', 'S1720','S1730','S1740','S1750','S1780', 'S9999','S1820','S1830')"
+   arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # now merge the subsets
-   inList = [r'va_subset',r'non_va_subset']
-   outRoads = r'all_subset'
+   # inList = [r'va_subset',r'non_va_subset']
+   # outRoads = r'all_subset'
    # now merge
-   MergeRoads_tt(inList, outRoads)
+   # MergeRoads_tt(inList, outRoads)
    
    # now export a layer excluding limited access highways (RmpHwy = 2))
-   inRCL = 'all_centerline'
+   inRCL = 'all_subset'
    outRCL = 'all_subset_no_lah'
    where_clause = "RmpHwy <> 2"
    arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    # now export a layer with ONLY ramps/limited access highways) 
    # note that both subsets include ramps (RmpHwy = 1)
-   inRCL = 'all_centerline'
+   inRCL = 'all_subset'
    outRCL = 'all_subset_only_lah'
    where_clause = "RmpHwy <> 0"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   arcpy.Select_analysis(inRCL, outRCL, where_clause)
    
    
    # Road surface layer creation
