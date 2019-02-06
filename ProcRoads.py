@@ -3,12 +3,14 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2018-06-28
+# Last Edit: 2019-02-06
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
 
 # Usage tips:
+# See https://www2.census.gov/geo/pdfs/reference/mtfccs2018.pdf for current road codes in TIGER data
+
 # Use the following function sequence to prepare roads for travel time analysis:
 # - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
 # - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
@@ -19,6 +21,10 @@
 # - PrepRoadsVA_su (to add necessary fields to roads data)
 # - AssignBuffer_su (to assign road surface buffer widths)
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
+
+# Use the following function sequence to generate road density from TIGER road centerlines:
+# - FilterRoads_dens
+# - CalcRoadDensity
 # ---------------------------------------------------------------------------
 
 # Import Helper module and functions
@@ -27,13 +33,12 @@ from Helper import *
 
 def PrepRoadsVA_tt(inRCL):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
- - LOCAL_SPEED_MPH 
- - MTFCC
- - SEGMENT_EXISTS
- - RCL_ID
- If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
- 
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   - LOCAL_SPEED_MPH 
+   - MTFCC
+   - SEGMENT_EXISTS
+   - RCL_ID
+   
+   If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail. This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
  
    # Process: Create "SPEED_cmnt" field.
    # This field can be used to store QC comments related to speed, if needed.
@@ -117,11 +122,11 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
 
 def PrepRoadsTIGER_tt(inDir, inBnd, outRoads):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
-- MTFCC
-- RTTYP
-If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
+   - MTFCC
+   - RTTYP
+   If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
  
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # Process: Merge all roads
    arcpy.env.workspace = inDir
@@ -202,7 +207,7 @@ def MergeRoads_tt(inList, outRoads):
    - The input TIGER roads data are the output of running the PrepRoadsTIGER function.
    - The above two inputs are in the same coordinate system.
    
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
    
    # If input inList is actually a string delimited with semi-colons, need to parse and turn it into a list.
    if isinstance(inList, str):
@@ -230,23 +235,23 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
 def ExtractRCL_su(inRCL, outRCL):
    """Extracts the relevant features from the Virginia Road Centerlines (RCL) feature class to be used for creating road surfaces. Omits segments based on data in the MTFCC and SEGMENT_TYPE fields. If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
    
-Excludes the following MTFCC types:
-- S1730: Alleys
-- S1780: Parking Lot Roads
-- S9999: Driveways
-- S1710: Walkways/Pedestrian Trails
-- S1720: Stairways
-- S1740: Service Vehicle Private Drives
-- S1820: Bike Paths or Trails
-- S1830: Bridle Paths
-- S1500: 4WD Vehicular Trails
+   Excludes the following MTFCC types:
+   - S1730: Alleys
+   - S1780: Parking Lot Roads
+   - S9999: Driveways
+   - S1710: Walkways/Pedestrian Trails
+   - S1720: Stairways
+   - S1740: Service Vehicle Private Drives
+   - S1820: Bike Paths or Trails
+   - S1830: Bridle Paths
+   - S1500: 4WD Vehicular Trails
 
-Excludes the following SEGMENT_TYPE values:
-- 2: Bridge/Overpass
-- 10: Tunnel/Underpass
-- 50: Ferry Crossing
+   Excludes the following SEGMENT_TYPE values:
+   - 2: Bridge/Overpass
+   - 10: Tunnel/Underpass
+   - 50: Ferry Crossing
 
-This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
    printMsg('Extracting relevant road segments and saving...')
@@ -257,10 +262,10 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
 def PrepRoadsVA_su(inRCL, inVDOT):
    """Adds fields to road centerlines data, necessary for generating road surfaces.
-- inRCL = road centerlines feature class
-- inVDOT = VDOT attribute table (from same geodatabase as inRCL)
+   - inRCL = road centerlines feature class
+   - inVDOT = VDOT attribute table (from same geodatabase as inRCL)
 
-This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    # Define a class to store field information
    class Field:
@@ -316,12 +321,11 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
 def AssignBuffer_su(inRCL):
    """Assign road surface buffer width based on other attribute fields.
+   The codeblock used to assign buffer widths is based on information here:
+   https://nacto.org/docs/usdg/geometric_design_highways_and_streets_aashto.pdf. 
+   See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled way and shoulders for different road types and capacities. Relevant pages: 388,429,452, 476-478, 507-509.
 
-The codeblock used to assign buffer widths is based on information here:
-https://nacto.org/docs/usdg/geometric_design_highways_and_streets_aashto.pdf. 
-See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled way and shoulders for different road types and capacities. Relevant pages: 388,429,452, 476-478, 507-509.
-
-This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    # Get formatted time stamp and auto-generated comment
    ts = datetime.now()
@@ -478,7 +482,7 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
 def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
-This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
    
    arcpy.MakeFeatureLayer_management(inRCL, "lyrRCL")
    SelectLayerByLocation_management ("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION", "NOT_INVERT")
@@ -487,6 +491,68 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 0, "PYTHON")
    
    return inRCL
+
+def FilterRoads_dens(inRoads, selType, outRoads):
+   '''Makes a subset of roads to include only those to be used for calculating road density, and removes duplicates/overlaps.
+   This function is intended only for use with TIGER data in specific format; otherwise will fail.
+   Parameters:
+   - inRoads = Input roads from TIGER
+   - selType = Type of selection to apply, with options "ALL", "NO_HIGHWAY", "LOCAL"
+   - outRoads = Output feature class ready for density processing
+   '''
+   
+   # Specify selection query
+   if selType == "ALL":
+      selQry = "MTFCC in ('S1100', 'S1200', 'S1640', 'S1400', 'S1730', '1740')"
+      # Does not actually include ALL, but most. Includes primary roads, secondary roads, collector/arterial roads, service drives, local roads, and alleys
+   elif selType == "NO_HIGHWAY":
+      selQry = "MTFCC in ('S1200', 'S1640', 'S1400', 'S1730', '1740')"
+      # Same as above except excludes highways
+   elif selType == "LOCAL":
+      selQry = "MTFCC in ('S1640', 'S1400', 'S1730', '1740')"
+      # Same as above except excludes secondary roads
+   else:
+      printMsg('No valid selection type specified; aborting.')
+      sys.exit()
+      
+   # Subset records based on selection query
+   printMsg('Extracting relevant road segments and saving...')
+   tmpRoads = scratchGDB + os.sep + 'tmpRoads'
+   arcpy.Select_analysis (inRoads, tmpRoads, selQry)
+   
+   # Eliminate duplicates/overlaps
+   printMsg('Dissolving roads...')
+   arcpy.Dissolve_management(tmpRoads, outRoads, "", "", "SINGLE_PART", "DISSOLVE_LINES")
+   
+   printMsg('Roads ready for density calculation')
+   return outRoads
+
+def CalcRoadDensity(inRoads, inSnap, outRoadDens, sRadius = 250, outUnits = "SQUARE_KILOMETERS", outVals = "DENSITIES"):
+   '''Creates a kernel density surface from input roads.
+   Parameters:
+   - inRoads = Input lines feature class representing roads
+   - inSnap = Snap raster used to specify the output coordinate system, cell size, and cell alignment
+   - outRoadDens = Output raster representing road density
+   - sRadius = The search radius within which to calculate density. Units are based on the linear unit of the projection of the output spatial reference.
+   - outUnits = The desired area units of the output density values.
+   - outVals = Determines what the values in the output raster represent. Options: DENSITIES or EXPECTED_COUNTS
+   
+   NOTE: If input coordinate system units are meters, and outUnits are SQUARE_KILOMETERS, the output densities are km per square km. It gets difficult to intuitively interpret using other units.
+   '''
+   
+   arcpy.env.snapRaster = inSnap
+   arcpy.env.cellSize = inSnap
+   cellSize = arcpy.env.cellSize
+   
+   printMsg('Comparing coordinate system of input roads with snap raster...')
+   inRoads_prj = ProjectToMatch (inRoads, inSnap)
+   
+   printMsg('Calculating road density...')
+   outKDens = KernelDensity (inRoads_prj, "NONE", cellSize, sRadius, outUnits, outVals)
+   outKDens.save(outRoadDens)
+   
+   printMsg('Finished.')
+   return outRoadDens
       
 ############################################################################
 
@@ -505,65 +571,76 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
 
 def main():
+   ### Kirsten's Stuff
+   inRoads = r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
+   selType = "NO_HIGHWAY"
+   outRoads = r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
+   inSnap = r'C:\Users\xch43889\Downloads\Snap_AlbersCONUS30.tif\Snap_AlbersCONUS30.tif'
+   outRoadDens = r'F:\Working\RecMod\RecModProducts.gdb\Roads_kdens_250'
    
-   # Creating road subset with speed attribute for travel time analysis
+   FilterRoads_dens(inRoads, selType, outRoads)
+   CalcRoadDensity(outRoads, inSnap, outRoadDens)
    
-   # first create a new processing database: ...\prep_roads.gdb
-   # NOTE: I copied VA_CENTERLINE from the original source gdb to 
-   # this new geodatabase (prep_roads.gdb) in order to use it, since
-   # it could not be edited in the original gdb.
    
-   # set a scratch GDB for the session
-   scratchGDB = r'C:\David\scratch\roads.gdb'
+   ### David's Stuff
+   # # Creating road subset with speed attribute for travel time analysis
    
-   # process VA roads
-   orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
-   wd = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
-   arcpy.env.workspace = wd
-   # new FC to create
-   inRCL = r'VA_CENTERLINE'
-   # copy original FC to working GDB
-   arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + inRCL)
-   # note the following step can take hours to complete
-   PrepRoadsVA_tt(inRCL)
+   # # first create a new processing database: ...\prep_roads.gdb
+   # # NOTE: I copied VA_CENTERLINE from the original source gdb to 
+   # # this new geodatabase (prep_roads.gdb) in order to use it, since
+   # # it could not be edited in the original gdb.
    
-   # process Tiger (non-VA) roads
-   inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
-   inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
-   outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\non_va_centerline'
-   PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
+   # # set a scratch GDB for the session
+   # scratchGDB = r'C:\David\scratch\roads.gdb'
    
-   # extract subsets based on MTFCC
-   arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
-   inRCL = 'VA_CENTERLINE'
-   outRCL = 'va_subset'
-   # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
-   where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   # # process VA roads
+   # orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
+   # wd = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
+   # arcpy.env.workspace = wd
+   # # new FC to create
+   # inRCL = r'VA_CENTERLINE'
+   # # copy original FC to working GDB
+   # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + inRCL)
+   # # note the following step can take hours to complete
+   # PrepRoadsVA_tt(inRCL)
    
-   inRCL = 'non_va_centerline'
-   outRCL = 'non_va_subset'
-   # note: excludes pedestrian/private road types, internal census use (S1750)
-   where_clause = "MTFCC NOT IN ('S1730', 'S1750', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500')"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   # # process Tiger (non-VA) roads
+   # inDir = r'C:\David\projects\va_cost_surface\roads\nonVAcounties\unzip' # all non-VA roads shapefiles
+   # inBnd = r'C:\David\projects\va_cost_surface\roads_proc\va_boundary_50km.shp'
+   # outRoads = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb\non_va_centerline'
+   # PrepRoadsTIGER_tt(inDir, inBnd, outRoads)
    
-   # now merge the subsets
-   inList = [r'va_subset',r'non_va_subset']
-   outRoads = r'all_subset'
-   # now merge
-   MergeRoads_tt(inList, outRoads)
+   # # extract subsets based on MTFCC
+   # arcpy.env.workspace = r'C:\David\projects\va_cost_surface\roads_proc\prep_roads\prep_roads_2018Q3.gdb'
+   # inRCL = 'VA_CENTERLINE'
+   # outRCL = 'va_subset'
+   # # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
+   # where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
+   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   # now export a layer excluding limited access highways (RmpHwy = 2))
-   inRCL = 'all_subset'
-   outRCL = 'all_subset_no_lah'
-   where_clause = "RmpHwy <> 2"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   # inRCL = 'non_va_centerline'
+   # outRCL = 'non_va_subset'
+   # # note: excludes pedestrian/private road types, internal census use (S1750)
+   # where_clause = "MTFCC NOT IN ('S1730', 'S1750', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500')"
+   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
-   # now export a layer with ONLY ramps/limited access highways)
-   inRCL = 'all_subset'
-   outRCL = 'all_subset_only_lah'
-   where_clause = "RmpHwy <> 0"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   # # now merge the subsets
+   # inList = [r'va_subset',r'non_va_subset']
+   # outRoads = r'all_subset'
+   # # now merge
+   # MergeRoads_tt(inList, outRoads)
+   
+   # # now export a layer excluding limited access highways (RmpHwy = 2))
+   # inRCL = 'all_subset'
+   # outRCL = 'all_subset_no_lah'
+   # where_clause = "RmpHwy <> 2"
+   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   
+   # # now export a layer with ONLY ramps/limited access highways)
+   # inRCL = 'all_subset'
+   # outRCL = 'all_subset_only_lah'
+   # where_clause = "RmpHwy <> 0"
+   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
    
    
    # Road surface layer creation
