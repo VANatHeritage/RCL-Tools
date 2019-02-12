@@ -3,7 +3,7 @@
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creator: Kirsten R. Hazler
 # Creation Date: 2017-10-17 
-# Last Edit: 2019-02-06
+# Last Edit: 2019-02-12
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -527,11 +527,12 @@ def FilterRoads_dens(inRoads, selType, outRoads):
    printMsg('Roads ready for density calculation')
    return outRoads
 
-def CalcRoadDensity(inRoads, inSnap, outRoadDens, sRadius = 250, outUnits = "SQUARE_KILOMETERS", outVals = "DENSITIES"):
+def CalcRoadDensity(inRoads, inSnap, inMask, outRoadDens, sRadius = 250, outUnits = "SQUARE_KILOMETERS", outVals = "DENSITIES"):
    '''Creates a kernel density surface from input roads.
    Parameters:
    - inRoads = Input lines feature class representing roads
    - inSnap = Snap raster used to specify the output coordinate system, cell size, and cell alignment
+   - inMask = Feature class or raster used to specify processing extent and mask 
    - outRoadDens = Output raster representing road density
    - sRadius = The search radius within which to calculate density. Units are based on the linear unit of the projection of the output spatial reference.
    - outUnits = The desired area units of the output density values.
@@ -542,6 +543,8 @@ def CalcRoadDensity(inRoads, inSnap, outRoadDens, sRadius = 250, outUnits = "SQU
    
    arcpy.env.snapRaster = inSnap
    arcpy.env.cellSize = inSnap
+   arcpy.env.mask = inMask
+   arcpy.env.extent = inMask
    cellSize = arcpy.env.cellSize
    
    printMsg('Comparing coordinate system of input roads with snap raster...')
@@ -575,11 +578,12 @@ def main():
    inRoads = r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
    outRoads = r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
-   inSnap = r'C:\Users\xch43889\Downloads\Snap_AlbersCONUS30.tif\Snap_AlbersCONUS30.tif'
+   inSnap = r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
+   inMask = r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
    outRoadDens = r'F:\Working\RecMod\RecModProducts.gdb\Roads_kdens_250'
    
    FilterRoads_dens(inRoads, selType, outRoads)
-   CalcRoadDensity(outRoads, inSnap, outRoadDens)
+   CalcRoadDensity(outRoads, inSnap, inMask, outRoadDens)
    
    
    ### David's Stuff
