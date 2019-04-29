@@ -215,13 +215,13 @@ def main():
    # Set up variables here
    inDir = r'H:\Enviva\Roads\Zips\unzip'
    inRoadsGDB = r'H:\Enviva\Roads\Outputs\projectedRoads.gdb'
-   midSurfGDB = r'H:\Enviva\Roads\Outputs\roadSurfaces_mid.gdb'
-   midSurfRoads = r'H:\Enviva\Roads\Outputs\roadSurfaces_merged.gdb\roadSurf_mid'
+   maxSurfGDB = r'H:\Enviva\Roads\Outputs\roadSurfaces_max.gdb'
+   maxSurfRoads = r'H:\Enviva\Roads\Outputs\roadSurfaces_merged.gdb\roadSurf_max'
    
    # Set up function runs here
-   FilterAndProject(inDir, inRoadsGDB)
-   CreateRoadSurfaces(inRoadsGDB, midSurfRoads, "MID")
-   MergeFeatsInGDB(midSurfGDB, midSurfRoads)
+   #FilterAndProject(inDir, inRoadsGDB)
+   CreateRoadSurfaces(inRoadsGDB, maxSurfGDB, "MAX")
+   MergeFeatsInGDB(maxSurfGDB, maxSurfRoads)
    
 if __name__ == '__main__':
    main()
