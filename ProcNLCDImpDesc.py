@@ -13,9 +13,9 @@
 # as this dataset was found to have the better LAH/ramp classification than older datasets (i.e. 2016).
 # This information is only used to reclassify the impervious descriptor dataset (it does not "create" roads).
 
-# FIXME: Roads that cross LAH (over/underpass) are not represented in the dataset.
-#  SOLUTION: Use focal statistics to fill these areas based on maximum speed in window
-# FIXME: Tunnels are not represented in this dataset (as they are not surface roads).
+# FIXME: Need to fill in cells on over- or under-passes in the local speed raster
+#  SOLUTION: use focal statistics to fill these areas, with the maximum local road speed in a 3-cell circular window
+# FIXME: Tunnels are not represented in this dataset (they are not surface roads).
 #  SOLUTION: Major tunnels were hand digitized and are burned in to the dataset (see 'burnin_tunnels' feature class)
 # ---------------------------------------------------------------------------
 
@@ -23,9 +23,12 @@
 import Helper
 from Helper import *
 
+# workspace (will be created if not existing)
+arcpy.env.workspace = r'L:\David\projects\vulnerability_model\cost_surfaces\cost_surfaces_2016.gdb'
+
 # Datasets used in script
 # NLCD impervious descriptor
-imp0 = r'L:\David\GIS_data\NLCD\nlcd_2016\nlcd_2016ed_Impervious_albers.gdb\impDescriptor_2001'
+imp0 = r'L:\David\GIS_data\NLCD\nlcd_2016\nlcd_2016ed_Impervious_albers.gdb\impDescriptor_2016'
 # Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads)
 road = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
 # Snap raster
@@ -35,14 +38,12 @@ burn = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\burnin_tunne
 # Speed remap values (reclassified impervious descriptor class to MPH)
 remap = RemapValue([[0, 3], [1, 45], [2, 55], [3, 35], [4, 45], [5, 25], [6, 35],
 [11, 45], [12, 55], [13, 35], [14, 45], [15, 25], [16, 35], [101, 60], [102, 70], [103, 50], [104, 60]])
-# workspace
-arcpy.env.workspace = r'L:\David\projects\vulnerability_model\cost_surfaces\cost_surfaces_2001.gdb'
 
 # create GDB
-try:
+if not os.path.exists(arcpy.env.workspace):
    arcpy.CreateFileGDB_management(os.path.dirname(arcpy.env.workspace), os.path.basename(arcpy.env.workspace))
-except:
-   print('GDB already exists')
+else:
+   print('GDB already exists. Will overwrite files in existing GDB.')
 
 # Environment settings
 arcpy.env.mask = snap
@@ -103,7 +104,7 @@ arcpy.sa.Reclassify('temp_imprcl_lah', 'Value', remap).save('lah_mph')
 (0.037 / Raster('lah_mph')).save('lah_cost')
 
 # delete temp, build pyramids
-rm = arcpy.ListFeatureClasses("temp_*") + (arcpy.ListRasters("temp_*"))
+rm = arcpy.ListFeatureClasses("temp_*") + (arcpy.ListRasters("*temp*"))
 for r in rm:
    arcpy.Delete_management(r)
 arcpy.BuildPyramidsandStatistics_management(arcpy.env.workspace)
