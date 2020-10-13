@@ -19,7 +19,7 @@ import arcpy
 project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
 wd = project + os.sep + 'cost_surfaces.gdb'
 
-# path to Limited access highways
+# path to Limited access highways (make sure to use the ones with the project you want
 lah = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
 # path to layer excluding limited access highways
 local = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
@@ -28,8 +28,8 @@ local = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
 # make LAH, ramp layers to work with
 arcpy.env.workspace = wd
 arcpy.env.overwriteOutput = True
-arcpy.Select_analysis(lah,'hwy','RmpHwy = 2')
-arcpy.Select_analysis(lah,'rmp','RmpHwy = 1')
+arcpy.Select_analysis(lah, 'hwy', 'RmpHwy = 2')
+arcpy.Select_analysis(lah, 'rmp', 'RmpHwy = 1')
 
 # identify ramps intersecting highways
 base = arcpy.MakeFeatureLayer_management("rmp")

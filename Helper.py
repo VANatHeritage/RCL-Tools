@@ -9,7 +9,7 @@
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
 
 # Import modules
-print 'Importing modules, including arcpy, which takes way longer than it should...'
+print('Importing modules, including arcpy, which takes way longer than it should...')
 import arcpy, os, sys, traceback
 from datetime import datetime as datetime
 from arcpy.sa import *

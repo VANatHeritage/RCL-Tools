@@ -76,7 +76,7 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 def main():
    # set project folder and create new cost surfaces GDB
    scratchGDB = "in_memory"
-   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2018'
    outGDB = project + os.sep + 'cost_surfaces.gdb'
    arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
 
@@ -100,6 +100,29 @@ def main():
    outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
 
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
-   
+
+   # walking cost surface-on local roads only
+   project = r'E:\RCL_cost_surfaces\Tiger_2018'
+   outGDB = project + os.sep + 'cost_surfaces.gdb'
+
+   inRoads1 = project + os.sep + 'roads_proc.gdb/all_centerline_urbAdjust'
+   inRoads = project + os.sep + 'roads_proc.gdb/all_centerline_walkable'
+   arcpy.Select_analysis(inRoads1, inRoads, "rmpHwy = 0 AND RTTYP <> 'I'")
+   outCostSurf = outGDB + os.sep + 'costSurf_walk0'
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = True) # lahOnly ensures background will be left null
+
+   # make background values raster (excludes LAH as nodata areas)
+   arcpy.env.extent = outCostSurf
+   lah = outGDB + os.sep + 'costSurf_only_lah'
+   crawl = Con(IsNull(lah), 0.03699, None)
+   crawl.save(outGDB + os.sep + 'crawl1')
+
+   # reassign walking/crawling speeds to final cost surface raster
+   out = Con(IsNull(outCostSurf), outGDB + os.sep + 'crawl1', 0.01233)
+   # set walking speed to all roads; 3x slower than walking speed everywhere else (except LAH/ramps, which stay NoData)
+   out.save(outGDB + os.sep + 'costSurf_walk')
+
+   garbagePickup([outGDB + os.sep + 'costSurf_walk0', outGDB + os.sep + 'crawl1'])
+
 if __name__ == '__main__':
    main()

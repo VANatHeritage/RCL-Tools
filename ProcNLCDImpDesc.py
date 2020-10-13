@@ -9,9 +9,11 @@
 # Both Limited access highways and local (all other roads) cost rasters are output.
 # Speeds are assigned in 'Remap' variable; alter this as needed.
 
-# Tiger roads are is used to define limited access highways and ramps. 2018 Tiger was used,
+# Tiger roads are used to define limited access highways and ramps. 2018 Tiger was used,
 # as this dataset was found to have the better LAH/ramp classification than older datasets (i.e. 2016).
 # This information is only used to reclassify the impervious descriptor dataset (it does not "create" roads).
+# This potentially could miss LAH/ramps from earlier time periods that are not in the same location
+# as the Tiger 2018 LAH/ramps.
 
 # FIXME: Need to fill in cells on over- or under-passes in the local speed raster
 #  SOLUTION: use focal statistics to fill these areas, with the maximum local road speed in a 3-cell circular window
@@ -24,17 +26,19 @@ import Helper
 from Helper import *
 
 # workspace (will be created if not existing)
-arcpy.env.workspace = r'L:\David\projects\vulnerability_model\cost_surfaces\cost_surfaces_2016.gdb'
+arcpy.env.workspace = r'L:\David\projects\vulnerability_model\cost_surfaces\cost_surfaces_2001.gdb'
 
 # Datasets used in script
 # NLCD impervious descriptor
-imp0 = r'L:\David\GIS_data\NLCD\nlcd_2016\nlcd_2016ed_Impervious_albers.gdb\impDescriptor_2016'
+imp0 = r'L:\David\GIS_data\NLCD\nlcd_2016\nlcd_2016ed_Impervious_albers.gdb\impDescriptor_2001'
 # Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads)
 road = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
-# Snap raster
-snap = imp0  # for now
+# Snap/mask raster
+snap = imp0
 # burn in tunnels feature class
 burn = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\burnin_tunnels'
+# ramp points
+ramp = r'L:\David\projects\RCL_processing\Tiger_2018\cost_surfaces.gdb\rmpt_final'
 # Speed remap values (reclassified impervious descriptor class to MPH)
 remap = RemapValue([[0, 3], [1, 45], [2, 55], [3, 35], [4, 45], [5, 25], [6, 35],
 [11, 45], [12, 55], [13, 35], [14, 45], [15, 25], [16, 35], [101, 60], [102, 70], [103, 50], [104, 60]])
@@ -64,10 +68,14 @@ arcpy.MosaicToNewRaster_management(["temp_imp0", "temp_burn"], arcpy.env.workspa
                                    mosaic_method="LAST")  # LAST uses burn values in overlap
 imp = "temp_imp"
 
+# distance to roads (euclidean)
+arcpy.sa.SetNull(imp, 1, 'Value = 0').save('temp_allrd')
+arcpy.sa.EucDistance('temp_allrd').save('allRoads_dist')
+
 # process limited access roads/ramps for reclassifying roads in impervious descriptor
 lah = arcpy.Select_analysis(road, 'temp_rd', "MTFCC IN ('S1100')")
 lah1 = arcpy.Buffer_analysis(lah, 'temp_rd_bufflah', 45, dissolve_option="ALL")
-# set LAH areas for Primary/Secondary roads to value of 100
+# set LAH areas for Primary/Secondary roads to value of 100 (Tertiary road class ignored for LAH)
 lah2 = arcpy.sa.ExtractByMask(imp, lah1)
 arcpy.sa.Reclassify(lah2, "Value", RemapRange([[0, 0, 0], [0.5, 4.5, 100], [4.5, 126, 0]])).save('temp_lah_raster')
 
@@ -78,7 +86,7 @@ rmp2 = arcpy.MultipartToSinglepart_management(rmp1, 'temp_rd_buffrmp1')
 rmp_lyr = arcpy.MakeFeatureLayer_management(rmp2)
 arcpy.SelectLayerByLocation_management(rmp_lyr, "INTERSECT", "temp_rd_bufflah", "#", "NEW_SELECTION")
 
-# set all ramp road areas to value of 10
+# set all ramp road areas to value of 10 (ramps can be any road class)
 rmp3 = arcpy.sa.ExtractByMask(imp, rmp_lyr)
 arcpy.sa.Reclassify(rmp3, "Value", RemapRange([[0, 0, 0], [0.5, 6.5, 10], [6.5, 126, 0]])).save('temp_rmp_raster')
 
@@ -86,7 +94,7 @@ arcpy.sa.Reclassify(rmp3, "Value", RemapRange([[0, 0, 0], [0.5, 6.5, 10], [6.5, 
 arcpy.sa.CellStatistics(['temp_lah_raster', 'temp_rmp_raster'], "MAXIMUM", "DATA").save('temp_lah_rmp')
 arcpy.sa.CellStatistics([imp, 'temp_lah_rmp'], "SUM", "DATA").save('temp_imprcl')
 
-# now set NULL LAH areas
+# now set NULL LAH areas (ramps will get included in both local/LAH rasters)
 arcpy.sa.SetNull('temp_imprcl', 'temp_imprcl', 'Value > 100').save('temp_imprcl_nolah')
 # reclassify values to MPH
 arcpy.sa.Reclassify('temp_imprcl_nolah', 'Value', remap).save('temp_mph_local1')
@@ -104,9 +112,14 @@ arcpy.sa.Reclassify('temp_imprcl_lah', 'Value', remap).save('lah_mph')
 (0.037 / Raster('lah_mph')).save('lah_cost')
 
 # delete temp, build pyramids
-rm = arcpy.ListFeatureClasses("temp_*") + (arcpy.ListRasters("*temp*"))
+rm = arcpy.ListFeatureClasses("temp_*") + (arcpy.ListRasters("temp_*"))
 for r in rm:
    arcpy.Delete_management(r)
 arcpy.BuildPyramidsandStatistics_management(arcpy.env.workspace)
+
+# Ramp processing (remove those on NODATA from LAH cost raster)
+rmpt0 = arcpy.sa.ExtractValuesToPoints(ramp, 'lah_cost', 'rmpt0')
+arcpy.Select_analysis(rmpt0, "ramp_points", '"RASTERVALU" <> -9999')
+arcpy.Delete_management('rmpt0')
 
 ## END

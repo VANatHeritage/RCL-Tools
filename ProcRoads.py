@@ -149,7 +149,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          if rttyp == 'I':
             return 70
          else:
-            return 55
+            return 65
       elif mtfcc in ['S1200', 'S1640']:
          # secondary roads (not limited access)
          if rttyp in ['I','S','U']:
@@ -187,25 +187,6 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       expression = "Speed(!Speed_upd!)"
       arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON_9.3",codeblock)
       outRoads = arcpy.Merge_management([noUrb, onlyUrb], outRoads + '_urbAdjust')
-      
-      #buff = arcpy.Buffer_analysis(urbAreas, "buff", "10 Meters", dissolve_option="ALL")
-      #buff2 = arcpy.PolygonToLine_management(buff)
-      #buffpt = arcpy.Intersect_analysis(outRoads, buff2)
-      #outRoadsSplit = arcpy.SplitLineAtPoint_management(outRoads, buffpt, outRoads + "_split")
-      #lyr = arcpy.MakeFeatureLayer_management(outRoadsSplit)
-      #urb = arcpy.MakeFeatureLayer_management(urbAreas)
-      #arcpy.SelectLayerByLocation_management(lyr, "INTERSECT", urb,"#", "NEW_SELECTION")
-      #codeblock = """def Speed(Speed_upd):
-      #   if Speed_upd > 30:
-      #      return Speed_upd - 10
-      #   else:
-      #      return Speed_upd"""
-      #expression = "Speed(!Speed_upd!)"
-      #arcpy.CalculateField_management(lyr, "Speed_upd", expression, "PYTHON_9.3",codeblock)
-      #arcpy.SelectLayerByAttribute_management(lyr, "CLEAR_SELECTION")
-      #garbagePickup([buff, buff2, buffpt])
-      #del [lyr,urb]
-      #outRoads = outRoadsSplit
 
    # Process: Create and calculate "TravTime" field
    # This field is used to store the travel time, in minutes, required to travel 1 meter, based on the road speed designation.
@@ -561,7 +542,7 @@ def main():
    scratchGDB = "in_memory"
 
    # set processing (project) folder name and output geodatabase
-   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2018'
    wd = project + os.sep + 'roads_proc.gdb'
    arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd)) # not necessary if already created
 
@@ -594,6 +575,18 @@ def main():
 
    # extract subset from non-VA (tiger)
    inRCL = 'all_centerline_urbAdjust'
+
+   #### speed adjust temp code
+   bla = arcpy.MakeFeatureLayer_management(inRCL)
+   arcpy.SelectLayerByAttribute_management(bla, "NEW_SELECTION", "MTFCC = 'S1100' AND RTTYP <> 'I'")
+   arcpy.GetCount_management(bla)
+   #arcpy.CalculateField_management(bla, "Speed_upd", "!Speed_upd! + 10", "PYTHON")
+   expression = "0.037/ !Speed_upd!"
+   arcpy.CalculateField_management(bla, "TravTime", expression, "PYTHON_9.3")
+   arcpy.SelectLayerByAttribute_management(bla, "CLEAR_SELECTION")
+   del bla
+   ####
+
    outRCL = 'all_subset'
    # This isn't necessary for costdist prep. All of these roads are assigned a walking speed already, so no need to exclude them
    # note: excludes pedestrian/private road types, internal census use (S1750)
