@@ -41,18 +41,19 @@
 # -------------------------------------------------------------------------------------------------------
 
 # Import required modules
-print 'Importing necessary modules...'
-import ftplib # needed to connect to the FTP server and download files
-import socket # needed to test FTP connection (or something; I dunno)
-import csv # needed to read/write CSV files
-import os # provides access to operating system funtionality such as file and directory paths
-import sys # provides access to Python system functions
-import traceback # used for error handling
-import gc # garbage collection
-import datetime # for time stamps
+print('Importing necessary modules...')
+import ftplib  # needed to connect to the FTP server and download files
+import socket  # needed to test FTP connection (or something; I dunno)
+import csv  # needed to read/write CSV files
+import os  # provides access to operating system functionality such as file and directory paths
+import sys  # provides access to Python system functions
+import traceback  # used for error handling
+import gc  # garbage collection
+import datetime  # for time stamps
 from datetime import datetime
 
-def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = '', extract = True):
+
+def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', extract=True):
    '''Downloads a set of zip files from an FTP site.  
       The file set is determined by a list in a user-provided CSV file, which is assumed to have a header row containing field names.
    in_tab = Table (in CSV format) containing unique ID field for the files to retrieve
@@ -66,19 +67,19 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
    # Create and open a log file.
    # If this log file already exists, it will be overwritten.  If it does not exist, it will be created.
    ProcLogFile = out_dir + os.sep + 'README.txt'
-   Log = open(ProcLogFile, 'w+') 
+   Log = open(ProcLogFile, 'w+')
    FORMAT = '%Y-%m-%d %H:%M:%S'
    timestamp = datetime.now().strftime(FORMAT)
    Log.write("Process logging started %s \n" % timestamp)
 
    # Initialize lists
-   FileList = list() # List to hold filenames
-   ProcList = list() # List to hold processing results
+   FileList = list()  # List to hold filenames
+   ProcList = list()  # List to hold processing results
 
    # Make a list of the files to download, from the input table
-   print 'Reading table...'
+   print('Reading table...')
    try:
-      with open(in_tab, 'r' ) as theFile:
+      with open(in_tab, 'r') as theFile:
          reader = csv.DictReader(theFile)
          for row in reader:
             fname = pre + row[in_fld] + suf
@@ -90,79 +91,85 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre = '', suf = 
    try:
       ftp = ftplib.FTP(ftpHOST)
       msg = "\nCONNECTED TO HOST '%s' \n" % ftpHOST
-      print msg
+      print(msg)
       Log.write(msg)
    except (socket.error, socket.gaierror) as e:
       msg = 'Error: cannot reach "%s" \n' % ftpHOST
-      print msg
+      print(msg)
       Log.write(msg)
       exit()
 
    try:
       ftp.login()
-      print 'Logged in'
+      print('Logged in')
    except ftplib.error_perm:
       msg = 'Error: cannot login annonymously \n'
-      print msg
+      print(msg)
       Log.write(msg)
       ftp.quit()
       exit()
 
    try:
       ftp.cwd(ftpDIR)
-      print 'Changed to "%s" folder' %ftpDIR
+      print('Changed to "%s" folder' % ftpDIR)
    except ftplib.error_perm:
-      msg = 'Error: cannot CD to "%s" \n' %ftpDIR
-      print msg
-      Log.write (msg)
+      msg = 'Error: cannot CD to "%s" \n' % ftpDIR
+      print(msg)
+      Log.write(msg)
       ftp.quit()
       exit()
 
    # Download the files and save to the output directory, while keeping track of success/failure
    for fileName in FileList:
       try:
-         print('Downloading %s ...' % fileName)
-         with open(os.path.join(out_dir, fileName), 'wb') as local_file:
-            ftp.retrbinary('RETR '+ fileName, local_file.write)
-         ProcList.append('Successfully downloaded %s' % fileName)
+         if not os.path.exists(os.path.join(out_dir, fileName)):
+            with open(os.path.join(out_dir, fileName), 'wb') as local_file:
+               print('Downloading %s ...' % fileName)
+               ftp.retrbinary('RETR ' + fileName, local_file.write)
+               ProcList.append('Successfully downloaded %s' % fileName)
+         else:
+            print('Already downloaded %s ...' % fileName)
+            ProcList.append('Already downloaded %s' % fileName)
       except:
          ProcList.append('Failed to download %s' % fileName)
 
    # Write download results to log.
    for item in ProcList:
       Log.write("%s\n" % item)
-    
+
    timestamp = datetime.now().strftime(FORMAT)
-   Log.write("\nProcess logging ended %s" % timestamp)   
+   Log.write("\nProcess logging ended %s" % timestamp)
    Log.close()
-   
+
    if extract:
       try:
          import BatchExtractZipFiles
          BatchExtractZipFiles.BatchExtractZipFiles(out_dir, out_dir + os.sep + 'unzip')
-         print 'All files extracted.'
+         print('All files extracted.')
       except:
-         print 'Error unzipping files.'
+         print('Error unzipping files.')
 
    return
-   
+
+
 ##################################################################################################################
 # Use the main function below to run a function directly from Python IDE or command line with hard-coded variables
 
 def main():
    # Set up variables 
    # The following are for TIGER/Line roads data
-   in_tab = r'F:\David\projects\RCL_processing\counties.txt'
-   in_fld = 'GEOID' #(5-digit code for state/county)
-   out_dir = r'F:\David\projects\RCL_processing\Tiger_2018\data'
+   in_tab = r'F:\David\projects\RCL_processing\counties_50mile_VAwatershed.txt'
+   in_fld = 'GEOID'  # (5-digit code for state/county)
+   out_dir = r'F:\David\projects\RCL_processing\Tiger_2019\data'
    ftpHOST = 'ftp2.census.gov'
-   ftpDIR = 'geo/tiger/TIGER2018/ROADS'
-   pre = 'tl_2018_' 
-   suf = '_roads.zip' 
+   ftpDIR = 'geo/tiger/TIGER2019/ROADS'
+   pre = 'tl_2019_'
+   suf = '_roads.zip'
    extract = True
-   
+
    # Specify function to run
    BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre, suf, extract)
+
 
 if __name__ == '__main__':
    main()

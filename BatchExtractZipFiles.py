@@ -27,7 +27,7 @@ def BatchExtractZipFiles(ZipDir, OutDir):
    # If the output directory does not already exist, create it
    if not os.path.exists(OutDir):
       os.makedirs(OutDir)
-   print 'Extracting all files to ' + str(OutDir) + '...'
+   print('Extracting all files to ' + str(OutDir) + '...')
                                       
    # Set up the processing log                                   
    ProcLog = OutDir + os.sep + "ZipLog.txt"

@@ -9,7 +9,7 @@
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.
 
 # Import modules
-print 'Importing modules, including arcpy, which takes way longer than it should...'
+print('Importing modules, including arcpy, which takes way longer than it should...')
 import arcpy, os, sys, traceback
 from datetime import datetime as datetime
 from arcpy.sa import *
@@ -41,17 +41,17 @@ def GetElapsedTime (t1, t2):
 
 def printMsg(msg):
    arcpy.AddMessage(msg)
-   print msg
+   print(msg)
    return
    
 def printWrng(msg):
    arcpy.AddWarning(msg)
-   print 'Warning: ' + msg
+   print('Warning: ' + msg)
    return
    
 def printErr(msg):
    arcpy.AddError(msg)
-   print 'Error: ' + msg
+   print('Error: ' + msg)
    return
    
 def ProjectToMatch (fcTarget, csTemplate):

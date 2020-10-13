@@ -22,8 +22,8 @@
 # ---------------------------------------------------------------------------
 
 # Import Helper module and functions
-import Helper
 from Helper import *
+
 
 def PrepRoadsVA_tt(inRCL):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
@@ -114,6 +114,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
+
 
 def PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas = None):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
@@ -238,6 +239,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
 
+
 def MergeRoads_tt(inList, outRoads):
    """Merges VA RCL data with TIGER roads data, retaining only specified fields needed for travel time analysis in the output. 
 
@@ -271,6 +273,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Mission accomplished.")
    return outRoads
 
+
 def ExtractRCL_su(inRCL, outRCL):
    """Extracts the relevant features from the Virginia Road Centerlines (RCL) feature class to be used for creating road surfaces. Omits segments based on data in the MTFCC and SEGMENT_TYPE fields. If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
    
@@ -298,7 +301,8 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    printMsg('Roads extracted.')
    
    return outRCL
-   
+
+
 def PrepRoadsVA_su(inRCL, inVDOT):
    """Adds fields to road centerlines data, necessary for generating road surfaces.
 - inRCL = road centerlines feature class
@@ -357,7 +361,8 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    printMsg('Roads attribute table updated.')
    
    return inRCL
-   
+
+
 def AssignBuffer_su(inRCL):
    """Assign road surface buffer width based on other attribute fields.
 
@@ -509,6 +514,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    
    return inRCL
 
+
 def CreateRoadSurfaces_su(inRCL, outSurfaces):
    """Generates road surfaces from road centerlines.
    
@@ -518,7 +524,8 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
    printMsg('Mission accomplished.')
    
    return outSurfaces
-   
+
+
 def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
@@ -548,6 +555,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 # - AssignBuffer_su (to assign road surface buffer widths)
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
 
+
 def main():
    
    # Creating road subset with speed attribute for travel time analysis
@@ -561,7 +569,7 @@ def main():
    scratchGDB = "in_memory"
 
    # set processing (project) folder name and output geodatabase
-   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2011'
+   project = r'F:\David\projects\RCL_processing\Tiger_2011'
    wd = project + os.sep + 'roads_proc.gdb'
    arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd)) # not necessary if already created
 
@@ -575,10 +583,10 @@ def main():
    # PrepRoadsVA_tt(inRCL)
    
    # process Tiger (non-VA) roads
-   inBnd = r'\\Ng00242727\f\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
+   inBnd = r'F:\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
    inDir = project + '/data/unzip' # all non-VA roads shapefiles
    outRoads = wd + os.sep + 'all_centerline' # name used when processing Tiger-only
-   urbAreas = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
+   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
    PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas)
    # if manual editing for roads is needed, edit outRoads file
 
@@ -633,6 +641,7 @@ def main():
    # CreateRoadSurfaces_su(outRCL, outSurfaces)
    
    # End of user input
-   
+
+
 if __name__ == '__main__':
    main()
