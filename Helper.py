@@ -41,17 +41,17 @@ def GetElapsedTime (t1, t2):
 
 def printMsg(msg):
    arcpy.AddMessage(msg)
-   print msg
+   print(msg)
    return
    
 def printWrng(msg):
    arcpy.AddWarning(msg)
-   print 'Warning: ' + msg
+   print('Warning: ' + msg)
    return
    
 def printErr(msg):
    arcpy.AddError(msg)
-   print 'Error: ' + msg
+   print('Error: ' + msg)
    return
    
 def ProjectToMatch (fcTarget, csTemplate):
