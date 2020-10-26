@@ -41,7 +41,6 @@
 # -------------------------------------------------------------------------------------------------------
 
 # Import required modules
-print('Importing necessary modules...')
 import ftplib  # needed to connect to the FTP server and download files
 import socket  # needed to test FTP connection (or something; I dunno)
 import csv  # needed to read/write CSV files
@@ -53,7 +52,7 @@ import datetime  # for time stamps
 from datetime import datetime
 
 
-def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', extract=True):
+def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', extract=True, overwrite=False):
    '''Downloads a set of zip files from an FTP site.  
       The file set is determined by a list in a user-provided CSV file, which is assumed to have a header row containing field names.
    in_tab = Table (in CSV format) containing unique ID field for the files to retrieve
@@ -122,7 +121,7 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', 
    # Download the files and save to the output directory, while keeping track of success/failure
    for fileName in FileList:
       try:
-         if not os.path.exists(os.path.join(out_dir, fileName)):
+         if not os.path.exists(os.path.join(out_dir, fileName)) or overwrite:
             with open(os.path.join(out_dir, fileName), 'wb') as local_file:
                print('Downloading %s ...' % fileName)
                ftp.retrbinary('RETR ' + fileName, local_file.write)
@@ -158,9 +157,9 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', 
 def main():
    # Set up variables 
    # The following are for TIGER/Line roads data
-   in_tab = r'F:\David\projects\RCL_processing\counties_50mile_VAwatershed.txt'
+   in_tab = r'L:\David\projects\RCL_processing\counties_50mile_VAwatershed.txt'
    in_fld = 'GEOID'  # (5-digit code for state/county)
-   out_dir = r'F:\David\projects\RCL_processing\Tiger_2019\data'
+   out_dir = r'L:\David\projects\RCL_processing\Tiger_2019\data'
    ftpHOST = 'ftp2.census.gov'
    ftpDIR = 'geo/tiger/TIGER2019/ROADS'
    pre = 'tl_2019_'

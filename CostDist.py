@@ -20,10 +20,10 @@
 # ---------------------------------------------------------------------------
 
 # Import Helper module and functions
-import Helper
 from Helper import *
 
-def CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = False, valFld = "TravTime", priFld = "Speed_upd"):
+
+def CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=False, valFld="TravTime", priFld="Speed_upd"):
    """Creates a cost surface from road segments based on the TravTime field, which represents time, in minutes, to travel 1 meter at the posted road speed. Areas with no roads are assumed to allow walking speed of 3 miles/hour, equivalent to a TravTime value of  0.01233.
    
 Parameters:
@@ -35,94 +35,82 @@ Parameters:
 - priFld: The priority field, used to determine which road segment to use to assign cell values in cases of conflict. The default field is "Speed_upd".
 
 This function was adapted from ModelBuilder tools created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
-   
-   # Environment settings
-   arcpy.env.snapRaster = snpRast
-   # arcpy.env.mask = snpRast    # masking not desirable if long bridges will get masked out over water
-   arcpy.env.extent = inRoads # extent should be based on input roads; raster is just for snapping
-   
+
    # Ensure inputs are in same coordinate system
    printMsg('Checking coordinate systems of inputs...')
-   prjRoads = ProjectToMatch (inRoads, snpRast)
-   
+   prjRoads = ProjectToMatch(inRoads, snpRast)
+
    # Rasterize lines
    printMsg('Rasterizing lines...')
-   tmpRast = scratchGDB + os.sep + 'tmpRast'
+   tmpRast = outCostSurf + '0'
    arcpy.PolylineToRaster_conversion(prjRoads, valFld, tmpRast, "MAXIMUM_LENGTH", priFld, snpRast)
-   printMsg('Rasterized lines are stored as %s.' % tmpRast)
-   
+
    # Set time costs for non-roads to finalize cost surface
    printMsg('Creating final cost surface...')
    if lahOnly:
       # lahOnly has only highways/ramps, so no background value is needed
-      arcpy.CopyRaster_management(tmpRast, outCostSurf)
+      cs = ExtractByMask(tmpRast, snpRast)
    else:
       cs = Con(IsNull(tmpRast), 0.01233, tmpRast)
-      cs.save(outCostSurf)
-   
+   cs.save(outCostSurf)
    # Cleanup
    try:
       arcpy.Delete_management(tmpRast)
    except:
-      printMsg('Attmempted cleanup, but unable to delete %s.' % tmpRast)
-   
+      printMsg('Attempted cleanup, but unable to delete %s.' % tmpRast)
+
    printMsg('Mission accomplished.')
-   
    return outCostSurf
+
 
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
 def main():
+
    # set project folder and create new cost surfaces GDB
-   scratchGDB = "in_memory"
-   project = r'\\Ng00242727\f\David\projects\RCL_processing\Tiger_2018'
+   project = r'L:\David\projects\RCL_processing\Tiger_2019'
    outGDB = project + os.sep + 'cost_surfaces.gdb'
    arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
 
-   # snap raster
-   snpRast = r'\\Ng00242727\f\David\GIS_data\snap_rasters\Snap_AlbersCONUS30.tif'
+   # template raster
+   snpRast = r'L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84'
+   arcpy.env.extent = snpRast
+   arcpy.env.snapRaster = snpRast
+   arcpy.env.cellSize = snpRast
+   arcpy.env.mask = snpRast
 
-   # all roads cost surface (don't need this if using the two-step cost-distance approach)
-   # inRoads = project + os.sep + 'roads_proc.gdb/all_centerline'
-   # outCostSurf = outGDB + os.sep + 'costSurf_all'
-
-   # CostSurfTravTime(inRoads, snpRast, outCostSurf)
-   
    # LAH-only cost surface
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
    outCostSurf = outGDB + os.sep + 'costSurf_only_lah'
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=True)
 
-   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = True)
-   
    # no-LAH cost surface
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
    outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
-
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
 
-   # walking cost surface-on local roads only
-   project = r'E:\RCL_cost_surfaces\Tiger_2018'
+
+   # Make walking cost surface-on local roads only
+   # project = r'E:\RCL_cost_surfaces\Tiger_2019'
    outGDB = project + os.sep + 'cost_surfaces.gdb'
 
+   # Walkable roads include everything except LAH/ramps
    inRoads1 = project + os.sep + 'roads_proc.gdb/all_centerline_urbAdjust'
    inRoads = project + os.sep + 'roads_proc.gdb/all_centerline_walkable'
    arcpy.Select_analysis(inRoads1, inRoads, "rmpHwy = 0 AND RTTYP <> 'I'")
-   outCostSurf = outGDB + os.sep + 'costSurf_walk0'
-   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly = True) # lahOnly ensures background will be left null
-
-   # make background values raster (excludes LAH as nodata areas)
-   arcpy.env.extent = outCostSurf
+   outCostSurf = outGDB + os.sep + 'walkRoads'
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=True)
+   # Make background values for walking (excluding areas of LAH as nodata areas in the walk raster)
    lah = outGDB + os.sep + 'costSurf_only_lah'
-   crawl = Con(IsNull(lah), 0.03699, None)
-   crawl.save(outGDB + os.sep + 'crawl1')
+   Con(IsNull(lah), 0.03699, None).save(outGDB + os.sep + 'crawl')
+   # Final walking cost surface raster is: NoData on LAH roads, 3 MPH on all other roads, and 1 MPH in all other areas
+   Con(IsNull(outCostSurf), outGDB + os.sep + 'crawl', 0.01233).save(outGDB + os.sep + 'costSurf_walk')
 
-   # reassign walking/crawling speeds to final cost surface raster
-   out = Con(IsNull(outCostSurf), outGDB + os.sep + 'crawl1', 0.01233)
-   # set walking speed to all roads; 3x slower than walking speed everywhere else (except LAH/ramps, which stay NoData)
-   out.save(outGDB + os.sep + 'costSurf_walk')
-
-   garbagePickup([outGDB + os.sep + 'costSurf_walk0', outGDB + os.sep + 'crawl1'])
+   # clean up
+   garbagePickup([outGDB + os.sep + 'walkRoads', outGDB + os.sep + 'crawl'])
+   # Build pyramids for all rasters
+   arcpy.BuildPyramidsandStatistics_management(outGDB)
 
 if __name__ == '__main__':
    main()

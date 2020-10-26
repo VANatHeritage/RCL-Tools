@@ -27,18 +27,18 @@ from Helper import *
 
 def PrepRoadsVA_tt(inRCL):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
- - LOCAL_SPEED_MPH 
+ - LOCAL_SPEED_MPH
  - MTFCC
  - SEGMENT_EXISTS
  - RCL_ID
  If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
- 
+
 This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
- 
+
    # Process: Create "SPEED_cmnt" field.
    # This field can be used to store QC comments related to speed, if needed.
    printMsg("Adding 'SPEED_cmt' field...")
-   arcpy.AddField_management (inRCL, "SPEED_cmnt", "TEXT", "", "", 50)
+   arcpy.AddField_management(inRCL, "SPEED_cmnt", "TEXT", "", "", 50)
    # Process: Create and calculate "FlgFld"
    # This field is used to flag records with suspect LOCAL_SPEED_MPH values
    # 1 = Flagged: need to update speed based on MTFCC field
@@ -82,7 +82,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:
          return speed"""
    expression = "SpdUpd(!FlgFld!, !MTFCC!, !LOCAL_SPEED_MPH!)"
-   arcpy.CalculateField_management(inRCL, "SPEED_upd", expression, "PYTHON_9.3",codeblock)
+   arcpy.CalculateField_management(inRCL, "SPEED_upd", expression, "PYTHON_9.3", codeblock)
 
    # Process: Create and calculate "TravTime" field
    # This field is used to store the travel time, in minutes, required to travel 1 meter, based on the road speed designation.
@@ -111,36 +111,34 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    arcpy.AddField_management(inRCL, "UniqueID", "TEXT", "", "", "16")
    expression = "'VA_' +  str(int(!RCL_ID!))"
    arcpy.CalculateField_management(inRCL, "UniqueID", expression, "PYTHON_9.3")
-   
+
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
 
-def PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas = None):
+def PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=None):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
 - MTFCC
 - RTTYP
 If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
- 
+
 This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # Process: Merge all roads
    arcpy.env.workspace = inDir
-   arcpy.env.outputCoordinateSystem = inBnd # this should make projection unnecessary
    inList = arcpy.ListFeatureClasses()
-         
+
    printMsg("Merging TIGER roads datasets...")
-   mergeRds = scratchGDB + os.sep + "mergeRds"
-   prjRds = arcpy.Merge_management(inList, mergeRds)
-   
-   # Process: Project the merged roads to match the input boundary
-   #printMsg("Re-projecting roads to match boundary...")
-   #prjRds = ProjectToMatch(mergeRds, inBnd)
-   
-   # Process: Clip to boundary
-   printMsg("Clipping roads to boundary...")
-   arcpy.Clip_analysis(prjRds, inBnd, outRoads)
-   
+
+   if inBnd:
+      # Process: Clip to boundary
+      mergeRds = scratchGDB + os.sep + "mergeRds"
+      arcpy.Merge_management(inList, mergeRds)
+      printMsg("Clipping roads to boundary...")
+      arcpy.Clip_analysis(mergeRds, inBnd, outRoads)
+   else:
+      arcpy.Merge_management(inList, outRoads)
+
    # Process: Create and calculate "SPEED_upd" field.
    # This field is used to store speed values to be used in later processing. It allows for altering speed values according to QC criteria
    printMsg("Adding and populating 'Speed_upd' field...")
@@ -173,8 +171,8 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:  
          return 3"""
    expression = "Speed(!MTFCC!,!RTTYP!)"
-   arcpy.CalculateField_management(outRoads, "Speed_upd", expression, "PYTHON_9.3",codeblock)
-   
+   arcpy.CalculateField_management(outRoads, "Speed_upd", expression, "PYTHON_9.3", codeblock)
+
    # reduce speeds by 10 mph for road segments intersecting urban areas
    if urbAreas:
       printMsg("Adjusting speeds in urban areas...")
@@ -186,7 +184,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          else:
             return Speed_upd"""
       expression = "Speed(!Speed_upd!)"
-      arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON_9.3",codeblock)
+      arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON_9.3", codeblock)
       outRoads = arcpy.Merge_management([noUrb, onlyUrb], outRoads + '_urbAdjust')
 
    # Process: Create and calculate "TravTime" field
@@ -195,12 +193,12 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    arcpy.AddField_management(outRoads, "TravTime", "DOUBLE")
    expression = "0.037/ !SPEED_upd!"
    arcpy.CalculateField_management(outRoads, "TravTime", expression, "PYTHON_9.3")
-   
+
    # Process: Create and calculate the "RmpHwy" field
    # This field indicates if a road is a limited access highway (2), a ramp (1), or any other road type (0)
    printMsg("Adding and populating 'RmpHwy' field...")
    arcpy.AddField_management(outRoads, "RmpHwy", "SHORT")
-   codeblock = """def RmpHwy (mtfcc):
+   codeblock = """def RmpHwy(mtfcc):
       if mtfcc in ("S1100", "S1100HOV"):
          return 2
       elif mtfcc == "S1630":
@@ -209,14 +207,14 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          return 0"""
    expression = "RmpHwy(!MTFCC!)"
    arcpy.CalculateField_management(outRoads, "RmpHwy", expression, "PYTHON_9.3", codeblock)
-   
+
    # Process: Create and calculate the "UniqueID" field
    # This field stores a unique ID with a state prefix for ease of merging data from different states.
    printMsg("Adding and populating 'UniqueID' field...")
-   arcpy.AddField_management(outRoads, "UniqueID", "TEXT", "", "", "16")
+   arcpy.AddField_management(outRoads, "UniqueID", "TEXT", "", "", "30")
    expression = "'TL_' + !LINEARID!"
    arcpy.CalculateField_management(outRoads, "UniqueID", expression, "PYTHON_9.3")
-   
+
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
 
@@ -230,15 +228,15 @@ def MergeRoads_tt(inList, outRoads):
    - The above two inputs are in the same coordinate system.
    
 This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
-   
+
    # If input inList is actually a string delimited with semi-colons, need to parse and turn it into a list.
    if isinstance(inList, str):
       inList = inList.split(';')
       printMsg("String parsed.")
-   
+
    # Create the field mapping
    printMsg("Creating field mappings...")
-   inFlds = ['TravTime', 'UniqueID', 'RmpHwy', 'Speed_upd','MTFCC']
+   inFlds = ['TravTime', 'UniqueID', 'RmpHwy', 'Speed_upd', 'MTFCC']
    fldMappings = arcpy.FieldMappings()
    for fld in inFlds:
       fldMap = arcpy.FieldMap()
@@ -246,11 +244,11 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          fldMap.addInputField(tab, fld)
       fldMap.outputField.name = fld
       fldMappings.addFieldMap(fldMap)
-   
+
    # Merge datasets
    printMsg("Merging datasets...")
-   arcpy.Merge_management (inList, outRoads, fldMappings)
-   
+   arcpy.Merge_management(inList, outRoads, fldMappings)
+
    printMsg("Mission accomplished.")
    return outRoads
 
@@ -278,9 +276,9 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
    printMsg('Extracting relevant road segments and saving...')
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   arcpy.Select_analysis(inRCL, outRCL, where_clause)
    printMsg('Roads extracted.')
-   
+
    return outRCL
 
 
@@ -293,34 +291,39 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
    # Define a class to store field information
    class Field:
-      def __init__(self, Name = '', Type = '', Length = ''):
+      def __init__(self, Name='', Type='', Length=''):
          self.Name = Name
          self.Type = Type
          self.Length = Length
-   
+
    # Specify fields to add
    printMsg('Setting field definitions')
    # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage   
-   fldBuffM = Field('NH_BUFF_M', 'DOUBLE', '') # Buffer width in meters. This field is calculated automatically based on information in other fields.
-   fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '') # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed (-1 = needs attention; 0 = OK; 1 = record reviewed and amended)
-   fldComments = Field('NH_COMMENTS', 'TEXT', 500) # QC/processing/editing comments. This field is for automatic or manual data entry.
-   fldBuffFt = Field('NH_BUFF_FT', 'DOUBLE', '') # Buffer width in feet. This field is for manual data entry, used to override buffer width values that would otherwise be calculated.
-   fldConSite = Field('NH_CONSITE', 'SHORT', '') # Field to indicate if segment relevant to ConSite delineation (1 = close enough to features to be relevant; 0 = not relevant)
+   fldBuffM = Field('NH_BUFF_M', 'DOUBLE',
+                    '')  # Buffer width in meters. This field is calculated automatically based on information in other fields.
+   fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT',
+                   '')  # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed (-1 = needs attention; 0 = OK; 1 = record reviewed and amended)
+   fldComments = Field('NH_COMMENTS', 'TEXT',
+                       500)  # QC/processing/editing comments. This field is for automatic or manual data entry.
+   fldBuffFt = Field('NH_BUFF_FT', 'DOUBLE',
+                     '')  # Buffer width in feet. This field is for manual data entry, used to override buffer width values that would otherwise be calculated.
+   fldConSite = Field('NH_CONSITE', 'SHORT',
+                      '')  # Field to indicate if segment relevant to ConSite delineation (1 = close enough to features to be relevant; 0 = not relevant)
    addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt, fldConSite]
-   
+
    # Add the fields
    printMsg('Adding fields...')
    for f in addFields:
-      arcpy.AddField_management (inRCL, f.Name, f.Type, '', '', f.Length)
+      arcpy.AddField_management(inRCL, f.Name, f.Type, '', '', f.Length)
       printMsg('Field %s added.' % f.Name)
-   
+
    # Join fields from VDOT table
    printMsg('Joining attributes from VDOT table. This could take hours...')
    vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
-   #JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
-   #My JoinFields function failed to finish after ~24 hours, so I reverted to using arcpy.JoinField.
+   # JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   # My JoinFields function failed to finish after ~24 hours, so I reverted to using arcpy.JoinField.
    arcpy.JoinField_management(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
-   
+
    # Calculate flag field
    printMsg('Calculating flag field')
    expression = "calcFlagFld(!VDOT_SURFACE_WIDTH_MSR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
@@ -337,10 +340,10 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
          return -1
       else: 
          return 0'''
-   arcpy.CalculateField_management (inRCL, 'NH_SURFWIDTH_FLAG', expression, 'PYTHON', code_block)
-   
+   arcpy.CalculateField_management(inRCL, 'NH_SURFWIDTH_FLAG', expression, 'PYTHON', code_block)
+
    printMsg('Roads attribute table updated.')
-   
+
    return inRCL
 
 
@@ -355,9 +358,10 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
    # Get formatted time stamp and auto-generated comment
    ts = datetime.now()
-   stamp = '%s-%s-%s %s:%s' % (ts.year, str(ts.month).zfill(2), str(ts.day).zfill(2), str(ts.hour).zfill(2), str(ts.minute).zfill(2))
+   stamp = '%s-%s-%s %s:%s' % (
+   ts.year, str(ts.month).zfill(2), str(ts.day).zfill(2), str(ts.hour).zfill(2), str(ts.minute).zfill(2))
    comment = "Buffer distance auto-calculated %s" % stamp
-   
+
    # Calculate fields
    printMsg('Calculating buffer widths. This could take awhile...')
    expression = "calculateBuffer(!NH_SURFWIDTH_FLAG!, !NH_BUFF_FT!, !VDOT_SURFACE_WIDTH_MSR!, !LOCAL_SPEED_MPH!, !VDOT_TRAFFIC_AADT_NBR!, !MTFCC!, !VDOT_RTE_TYPE_CD!)"
@@ -488,11 +492,11 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
       # Use manually measured value if it exists
          buff_M = override*convFactor*2
       return buff_M"""
-   arcpy.CalculateField_management (inRCL, 'NH_BUFF_M', expression, 'PYTHON', code_block)
-   arcpy.CalculateField_management (inRCL, 'NH_COMMENTS', '"%s"' %comment, 'PYTHON')
-   
+   arcpy.CalculateField_management(inRCL, 'NH_BUFF_M', expression, 'PYTHON', code_block)
+   arcpy.CalculateField_management(inRCL, 'NH_COMMENTS', '"%s"' % comment, 'PYTHON')
+
    printMsg('Mission accomplished.')
-   
+
    return inRCL
 
 
@@ -503,7 +507,7 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
    printMsg('Creating road surfaces. This could take awhile...')
    arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
    printMsg('Mission accomplished.')
-   
+
    return outSurfaces
 
 
@@ -511,15 +515,16 @@ def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats, and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
 This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
-   
+
    arcpy.MakeFeatureLayer_management(inRCL, "lyrRCL")
-   SelectLayerByLocation_management ("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION", "NOT_INVERT")
+   arcpy.SelectLayerByLocation_management("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION", "NOT_INVERT")
    arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 1, "PYTHON")
    arcpy.SelectLayerByAttribute_management("lyrRCL", "SWITCH_SELECTION")
    arcpy.CalculateField_management("lyrRCL", "NH_CONSITE", 0, "PYTHON")
-   
+
    return inRCL
-      
+
+
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
@@ -538,37 +543,35 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
 
 def main():
-   
    # Creating road subset with speed attribute for travel time analysis
-   
+
    # first create a new processing database: ...\prep_roads.gdb
    # NOTE: I copied VA_CENTERLINE from the original source gdb to 
    # this new geodatabase (prep_roads.gdb) in order to use it, since
    # it could not be edited in the original gdb.
-   
-   # set a scratch GDB for the session
-   scratchGDB = "in_memory"
 
    # set processing (project) folder name and output geodatabase
-   project = r'F:\David\projects\RCL_processing\Tiger_2011'
+   project = r'L:\David\projects\RCL_processing\Tiger_2019'
    wd = project + os.sep + 'roads_proc.gdb'
-   arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd)) # not necessary if already created
+   arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))  # not necessary if already created
 
    # process VA roads
-   # orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
+   # orig_VA_CENTERLINE = r'L:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
    # new FC to create
    # inRCL = r'VA_CENTERLINE'
    # copy original FC to working GDB
    # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + os.sep + inRCL)
    # note the following step can take hours to complete
    # PrepRoadsVA_tt(inRCL)
-   
+
    # process Tiger (non-VA) roads
-   inBnd = r'F:\David\projects\RCL_processing\VA_Buff50mi\VA_Buff50mi.shp'
-   inDir = project + '/data/unzip' # all non-VA roads shapefiles
-   outRoads = wd + os.sep + 'all_centerline' # name used when processing Tiger-only
-   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas' # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
-   PrepRoadsTIGER_tt(inDir, inBnd, outRoads, urbAreas)
+   inDir = project + '/data/unzip'  # all non-VA roads shapefiles
+   outRoads = wd + os.sep + 'all_centerline'  # name used when processing Tiger-only
+   urbAreas = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'  # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
+
+   # output coordinate system
+   arcpy.env.outputCoordinateSystem = r'L:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
+   PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=urbAreas)
    # if manual editing for roads is needed, edit outRoads file
 
    # Subset roads
@@ -583,56 +586,45 @@ def main():
 
    # extract subset from non-VA (tiger)
    inRCL = 'all_centerline_urbAdjust'
-
-   #### speed adjust temp code
-   bla = arcpy.MakeFeatureLayer_management(inRCL)
-   arcpy.SelectLayerByAttribute_management(bla, "NEW_SELECTION", "MTFCC = 'S1100' AND RTTYP <> 'I'")
-   arcpy.GetCount_management(bla)
-   #arcpy.CalculateField_management(bla, "Speed_upd", "!Speed_upd! + 10", "PYTHON")
-   expression = "0.037/ !Speed_upd!"
-   arcpy.CalculateField_management(bla, "TravTime", expression, "PYTHON_9.3")
-   arcpy.SelectLayerByAttribute_management(bla, "CLEAR_SELECTION")
-   del bla
-   ####
-
    outRCL = 'all_subset'
-   # This isn't necessary for costdist prep. All of these roads are assigned a walking speed already, so no need to exclude them
+   # This isn't really necessary for costdist prep, since all of these roads are assigned a walking speed already. But
+   # should reduce processing time.
    # note: excludes pedestrian/private road types, internal census use (S1750)
    where_clause = "MTFCC NOT IN ('S1500','S1710', 'S1720','S1730','S1740','S1750','S1780', 'S9999','S1820','S1830')"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
-   
+   arcpy.Select_analysis(inRCL, outRCL, where_clause)
+   unique_values(outRCL, 'Speed_upd')
+
    # now merge the subsets
    # inList = [r'va_subset',r'non_va_subset']
    # outRoads = r'all_subset'
    # now merge
    # MergeRoads_tt(inList, outRoads)
-   
+
    # now export a layer excluding limited access highways (RmpHwy = 2))
    inRCL = 'all_subset'
    outRCL = 'all_subset_no_lah'
    where_clause = "RmpHwy <> 2"
-   arcpy.Select_analysis (inRCL, outRCL, where_clause)
-   
+   arcpy.Select_analysis(inRCL, outRCL, where_clause)
+
    # now export a layer with ONLY ramps/limited access highways) 
    # note that both subsets include ramps (RmpHwy = 1)
    inRCL = 'all_subset'
    outRCL = 'all_subset_only_lah'
    where_clause = "RmpHwy <> 0"
    arcpy.Select_analysis(inRCL, outRCL, where_clause)
-   
-   
+   # TODO: cost surfaces and ramp points for 2019
    # Road surface layer creation
-   
+
    # Set up your variables here
    # outRCL = r'\outputpath\RCL_subset_20180529'
    # inVDOT = r'path\to\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
    # outSurfaces = r'outputpath\RCL_subset_20180529\RCL_surfaces'
-   
+
    # Include the desired function run statement(s) below
    # PrepRoadsVA_su(outRCL, inVDOT)
    # AssignBuffer_su(outRCL)
    # CreateRoadSurfaces_su(outRCL, outSurfaces)
-   
+
    # End of user input
 
 
