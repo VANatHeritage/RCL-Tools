@@ -10,12 +10,17 @@
 
 # Import modules
 print('Importing modules, including arcpy, which takes way longer than it should...')
-import arcpy, os, sys, traceback
+import arcpy
+import os
+import sys
+import traceback
 from datetime import datetime as datetime
-from arcpy.sa import *
 arcpy.CheckOutExtension("Spatial")
+from arcpy.sa import *
+
 scratchGDB = arcpy.env.scratchGDB
 arcpy.env.overwriteOutput = True
+
 
 def countFeatures(features):
    '''Gets count of features'''
