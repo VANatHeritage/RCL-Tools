@@ -698,7 +698,7 @@ def main():
    # This isn't really necessary for costdist prep, since all of these roads are assigned a walking speed already. But
    # should reduce processing time.
    # note: excludes pedestrian/private road types, internal census use (S1750)
-   where_clause = "MTFCC NOT IN ('S1500','S1710', 'S1720','S1730','S1740','S1750','S1780', 'S9999','S1820','S1830')"
+   where_clause = "MTFCC NOT IN ('S1710','S1720','S1730','S1750','S9999','S1820','S1830')"
    arcpy.Select_analysis(inRCL, outRCL, where_clause)
    unique_values(outRCL, 'Speed_upd')
 

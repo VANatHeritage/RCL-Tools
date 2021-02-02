@@ -79,6 +79,7 @@ def main():
    arcpy.env.snapRaster = snpRast
    arcpy.env.cellSize = snpRast
    arcpy.env.mask = snpRast
+   arcpy.env.overwriteOutput = True
 
    # LAH-only cost surface
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
@@ -89,7 +90,6 @@ def main():
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
    outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
-
 
    # Make walking cost surface-on local roads only
    # project = r'E:\RCL_cost_surfaces\Tiger_2019'
