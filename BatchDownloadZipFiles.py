@@ -45,6 +45,7 @@ import ftplib  # needed to connect to the FTP server and download files
 import socket  # needed to test FTP connection (or something; I dunno)
 import csv  # needed to read/write CSV files
 import os  # provides access to operating system functionality such as file and directory paths
+import BatchExtractZipFiles
 import sys  # provides access to Python system functions
 import traceback  # used for error handling
 import gc  # garbage collection
@@ -142,7 +143,6 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', 
 
    if extract:
       try:
-         import BatchExtractZipFiles
          BatchExtractZipFiles.BatchExtractZipFiles(out_dir, out_dir + os.sep + 'unzip')
          print('All files extracted.')
       except:
@@ -159,10 +159,10 @@ def main():
    # The following are for TIGER/Line roads data
    in_tab = r'L:\David\projects\RCL_processing\counties_50mile_VAwatershed.txt'
    in_fld = 'GEOID'  # (5-digit code for state/county)
-   out_dir = r'L:\David\projects\RCL_processing\Tiger_2019\data'
+   out_dir = r'L:\David\projects\RCL_processing\Tiger_2020\data'
    ftpHOST = 'ftp2.census.gov'
-   ftpDIR = 'geo/tiger/TIGER2019/ROADS'
-   pre = 'tl_2019_'
+   ftpDIR = 'geo/tiger/TIGER2020/ROADS'
+   pre = 'tl_2020_'
    suf = '_roads.zip'
    extract = True
 

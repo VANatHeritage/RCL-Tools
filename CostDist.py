@@ -23,14 +23,14 @@
 from Helper import *
 
 
-def CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=False, valFld="TravTime", priFld="Speed_upd"):
+def CostSurfTravTime(inRoads, snpRast, outCostSurf, bkgdNoData=False, valFld="TravTime", priFld="Speed_upd"):
    """Creates a cost surface from road segments based on the TravTime field, which represents time, in minutes, to travel 1 meter at the posted road speed. Areas with no roads are assumed to allow walking speed of 3 miles/hour, equivalent to a TravTime value of  0.01233.
    
 Parameters:
 - inRoads: Input roads feature class. This should have been produced by running the sequence of functions in the ProcRoads.py module.
 - snpRast: A raster used as a processing mask and to set cell size and alignment. This could be an NLCD raster resampled to 5-m cells, for example.
 - outCostSurf: The output raster dataset.
-- lahOnly: Boolean, default value is False. If True, the background value is NoData; if False, it is set to a walking speed value.
+- bkgdNoData: Boolean, default value is False. If True, the background value is NoData; if False, it is set to a walking speed value.
 - valFld: The field used to set the output raster values. The default field is "TravTime".
 - priFld: The priority field, used to determine which road segment to use to assign cell values in cases of conflict. The default field is "Speed_upd".
 
@@ -47,8 +47,8 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 
    # Set time costs for non-roads to finalize cost surface
    printMsg('Creating final cost surface...')
-   if lahOnly:
-      # lahOnly has only highways/ramps, so no background value is needed
+   if bkgdNoData:
+      # bkgdNoData has only highways/ramps, so no background value is needed
       cs = ExtractByMask(tmpRast, snpRast)
    else:
       cs = Con(IsNull(tmpRast), 0.01233, tmpRast)
@@ -69,9 +69,10 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 def main():
 
    # set project folder and create new cost surfaces GDB
-   project = r'L:\David\projects\RCL_processing\Tiger_2019'
+   project = r'L:\David\projects\RCL_processing\Tiger_2020'
    outGDB = project + os.sep + 'cost_surfaces.gdb'
-   arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
+   if not arcpy.Exists(outGDB):
+      arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
 
    # template raster
    snpRast = r'L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84'
@@ -84,23 +85,19 @@ def main():
    # LAH-only cost surface
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
    outCostSurf = outGDB + os.sep + 'costSurf_only_lah'
-   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=True)
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, bkgdNoData=True)
 
    # no-LAH cost surface
    inRoads = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
    outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
    CostSurfTravTime(inRoads, snpRast, outCostSurf)
 
-   # Make walking cost surface-on local roads only
-   # project = r'E:\RCL_cost_surfaces\Tiger_2019'
-   outGDB = project + os.sep + 'cost_surfaces.gdb'
-
-   # Walkable roads include everything except LAH/ramps
+   # Make walking cost surface-on local roads only: Walkable roads include everything except LAH/ramps
    inRoads1 = project + os.sep + 'roads_proc.gdb/all_centerline_urbAdjust'
    inRoads = project + os.sep + 'roads_proc.gdb/all_centerline_walkable'
    arcpy.Select_analysis(inRoads1, inRoads, "rmpHwy = 0 AND RTTYP <> 'I'")
    outCostSurf = outGDB + os.sep + 'walkRoads'
-   CostSurfTravTime(inRoads, snpRast, outCostSurf, lahOnly=True)
+   CostSurfTravTime(inRoads, snpRast, outCostSurf, bkgdNoData=True)
    # Make background values for walking (excluding areas of LAH as nodata areas in the walk raster)
    lah = outGDB + os.sep + 'costSurf_only_lah'
    Con(IsNull(lah), 0.03699, None).save(outGDB + os.sep + 'crawl')

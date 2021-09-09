@@ -535,27 +535,34 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
    return inRCL
 
 
-def RemoveDupRoads(inRoads, outRoads, sort=["Speed_upd DESCENDING"]):
+def RemoveDupRoads(inRoads, outRoads, sort_fld=[["Speed_upd", "DESCENDING"]]):
    """Duplicate road segement removal from Tiger/Line roads dataset. Retains segment according to the priority
     in the sort argument (default is to retain highest speed segment). Arguments:
     - inRoads: Input roads. Make sure to filter to subset desired
     - outRoads: Output roads feature class
-    - sort: sorting order list, e.g.: ["Field_name ORDER", "Field_name2, ORDER"]
+    - sort_fld: sorting order list, e.g.: [["Field1", "ASCENDING"], ["Field2", "DESCENDING"]]
 
     Could be added as internal fn to FilterRoad_dens, in place of Dissolve.
     Uses an ArcPro-only function (CountOverlappingFeatures)"""
 
-   sort_fld = ';'.join(sort) + ';OBJECTID ASCENDING'
-   arcpy.Sort_management(inRoads, 'road0', sort_fld)
-   printMsg('Making unique segments for overlapping roads...')
-   arcpy.CountOverlappingFeatures_analysis("road0", "over0", 2)
-   arcpy.SpatialJoin_analysis("over0", "road0", "over1", "JOIN_ONE_TO_ONE", "KEEP_ALL",
-                              match_option="SHARE_A_LINE_SEGMENT_WITH")
-   printMsg('Creating no-duplicates roads dataset...')
-   arcpy.Erase_analysis(inRoads, "over1", outRoads)
-   arcpy.Append_management('over1', outRoads, "NO_TEST")
+   # arcpy.Sort_management(inRoads, 'road0', sort_fld)
+   # printMsg('Making unique segments for overlapping roads...')
+   # arcpy.CountOverlappingFeatures_analysis("road0", "over0", 2)
+   # # Join one to one (should join with the first record in sorted dataset).
+   # arcpy.SpatialJoin_analysis("over0", "road0", "over1", "JOIN_ONE_TO_ONE", "KEEP_ALL",
+   #                            match_option="SHARE_A_LINE_SEGMENT_WITH")
+   # printMsg('Creating no-duplicates roads dataset...')
+   # arcpy.Erase_analysis(inRoads, "over1", outRoads)
+   # arcpy.Append_management('over1', outRoads, "NO_TEST")
+   # garbagePickup(['road0', 'over0', 'over1'])
 
-   garbagePickup(['road0', 'over0', 'over1'])
+   printMsg('Making unique segments for overlapping roads...')
+   arcpy.CountOverlappingFeatures_analysis(inRoads, "over0")
+   arcpy.SpatialJoin_analysis('over0', inRoads, 'road1', "JOIN_ONE_TO_MANY", match_option="WITHIN")
+   printMsg('Creating no-duplicates roads dataset...')
+   arcpy.Sort_management('road1', outRoads, sort_fld)
+   arcpy.DeleteIdentical_management(outRoads, "TARGET_FID")
+   garbagePickup(['road1', 'over0'])
 
    return outRoads
 
@@ -590,9 +597,9 @@ def FilterRoads_dens(inRoads, selType, outRoads):
 
    # Eliminate duplicates/overlaps
    printMsg('Generating unique roads segments...')
-   arcpy.Dissolve_management(tmpRoads, outRoads, "", "", "SINGLE_PART", "DISSOLVE_LINES")
+   # arcpy.Dissolve_management(tmpRoads, outRoads, "", "", "SINGLE_PART", "DISSOLVE_LINES")
    # Below retains original road segments/attributes
-   # RemoveDupRoads(tmpRoads, outRoads)
+   RemoveDupRoads(tmpRoads, outRoads)
 
    printMsg('Roads ready for density calculation')
    return outRoads
@@ -626,12 +633,68 @@ def CalcRoadDensity(inRoads, inSnap, inMask, outRoadDens, sRadius=250, outUnits=
 
    printMsg('Calculating road density...')
    outKDens = arcpy.sa.KernelDensity(inRoads_prj, "NONE", cellSize, sRadius, outUnits, outVals)
-   outKDens.save(outRoadDens)
+   arcpy.sa.SetNull(outKDens, outKDens, "Value <= 0").save(outRoadDens)
+   # outKDens.save(outRoadDens)
    arcpy.BuildPyramids_management(outRoadDens)
 
    printMsg('Finished.')
    return outRoadDens
 
+
+def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", local="MTFCC NOT IN ('S1100', 'S1630')"):
+   """
+   This functions generates 'ramp points' for use as junctions in a network dataset. It generates
+   points at all ramp segment endpoints which intersect a limited access highway or local road.
+   """
+
+   lyr_rmp = arcpy.MakeFeatureLayer_management(roads, where_clause=ramp)
+   arcpy.FeatureVerticesToPoints_management(lyr_rmp, "r1", "BOTH_ENDS")
+   lyr_rmppt = arcpy.MakeFeatureLayer_management("r1")
+
+   # select ramp points intersecting highways
+   print('Getting junctions of ramps and highway...')
+   lyr_hwy = arcpy.MakeFeatureLayer_management(roads, where_clause=highway)
+   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_hwy)
+   arcpy.CopyFeatures_management(lyr_rmppt, rampPts)
+   arcpy.CalculateField_management(rampPts, "junction", 1, field_type="SHORT")
+
+   ## get "dead end" hwy points (transition from LAH to local road without ramp) points
+   arcpy.Dissolve_management(lyr_hwy, 'hwy_end_diss', "#", "#", "SINGLE_PART", "UNSPLIT_LINES")
+   arcpy.FeatureVerticesToPoints_management("hwy_end_diss", "he1", "BOTH_ENDS")
+   he1 = arcpy.MakeFeatureLayer_management("he1")
+
+   # select those highway ends intersecting with ramps
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp)
+   arcpy.CopyFeatures_management(he1, "hwy_endpts")
+   arcpy.CalculateField_management('hwy_endpts', "junction", 1, field_type="SHORT")
+   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
+
+   # select ramp points intersecting local roads
+   print('Getting junctions of ramps and local...')
+   lyr_loc = arcpy.MakeFeatureLayer_management(roads, where_clause=local)
+   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_loc)
+   arcpy.CopyFeatures_management(lyr_rmppt, 'tmp_ints')
+   arcpy.CalculateField_management('tmp_ints', "junction", 2, field_type="SHORT")
+   # This will append local ramp intersections, then delete those identical to a highway ramp intersection (hwy takes precendence)
+   arcpy.Append_management('tmp_ints', rampPts, "NO_TEST")
+   arcpy.SelectLayerByAttribute_management(lyr_rmppt, "CLEAR_SELECTION")
+
+   # now find highway ends that share endpoint with local roads
+   print('Getting junctions of highway ends and local...')
+   arcpy.SelectLayerByLocation_management(lyr_loc, "BOUNDARY_TOUCHES", "hwy_end_diss")
+   # now select highway end points intersecting those roads
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_loc)
+   # now remove those points intersecting ramps
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp, "#", "REMOVE_FROM_SELECTION")
+   arcpy.CopyFeatures_management(he1, "hwy_endpts")
+   arcpy.CalculateField_management('hwy_endpts', "junction", 3, field_type="SHORT")
+   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
+
+   print('Removing duplicate points...')
+   arcpy.DeleteIdentical_management(rampPts, ["Shape"])
+   arcpy.Delete_management(['tmp_ints', "r1", 'hwy_endpts'])
+
+   return rampPts
 
 ############################################################################
 
@@ -659,9 +722,10 @@ def main():
    # it could not be edited in the original gdb.
 
    # set processing (project) folder name and output geodatabase
-   project = r'L:\David\projects\RCL_processing\Tiger_2019'
+   project = r'L:\David\projects\RCL_processing\Tiger_2020'
    wd = project + os.sep + 'roads_proc.gdb'
-   # arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))  # not necessary if already created
+   if not arcpy.Exists(wd):
+      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
 
    # process VA roads
    # orig_VA_CENTERLINE = r'L:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
@@ -692,7 +756,7 @@ def main():
    # where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
    # arcpy.Select_analysis (inRCL, outRCL, where_clause)
 
-   # extract subset from non-VA (tiger)
+   # extract driving-only roads subset from non-VA (tiger)
    inRCL = 'all_centerline_urbAdjust'
    outRCL = 'all_subset'
    # This isn't really necessary for costdist prep, since all of these roads are assigned a walking speed already. But
@@ -721,22 +785,37 @@ def main():
    where_clause = "RmpHwy <> 0"
    arcpy.Select_analysis(inRCL, outRCL, where_clause)
 
-   # road duplicate removal. May implement this into travel time or road density calcuation
-   inRCL = arcpy.MakeFeatureLayer_management('all_centerline_urbAdjust', where_clause="MTFCC in ('S1200', 'S1640', 'S1400', 'S1730', '1740')")
-   RemoveDupRoads(inRCL, 'roads_filtered_wAtt')
+   # Make Network dataset feature classes
+   RemoveDupRoads('all_subset', 'all_subset_nodup')
+   RampPts('all_subset', "ramp_junctions")   # NOTE: use original roads for this (not dup. removed, which may result in extra vertices that get turned into ramp points if used)
+   # Make network GDB and feature dataset
+   rcl = project + os.sep + "RCL_Network.gdb"
+   arcpy.CreateFileGDB_management(os.path.dirname(rcl), os.path.basename(rcl))
+   # Make feature dataset and add feature classes
+   arcpy.CreateFeatureDataset_management(rcl, "RCL", arcpy.env.outputCoordinateSystem)
+   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_limitedAccess", "MTFCC = 'S1100'")
+   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_ramps", "MTFCC = 'S1630'")
+   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_local", "MTFCC NOT IN ('S1100', 'S1630')")
+   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "ramps_limitedAccess", "junction = 1")
+   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "ramps_local", "junction = 2")
+   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "limitedAccess_local", "junction = 3")
+   ls = ["roads_limitedAccess", "roads_ramps", "roads_local", "ramps_limitedAccess", "ramps_local", "limitedAccess_local"]
+   # Create Network dataset
+   arcpy.CreateNetworkDataset_na(os.path.join(rcl, 'RCL'), 'RCL_ND', ls, None)
+   # From here on, requires manual settings in ArcGIS pro.
 
    # Road density
    arcpy.env.workspace = wd
    inRoads = "all_centerline_urbAdjust"  # r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
-   outRoads = "roads_filtered_orig"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
+   outRoads = "roads_filtered"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
    inSnap = r"L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"  # r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
    inMask = r"L:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84"  # r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
    outRoadDens = "Roads_kdens_250"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_kdens_250'
 
    FilterRoads_dens(inRoads, selType, outRoads)
    CalcRoadDensity(outRoads, inSnap, inMask, outRoadDens)
-   arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
+   # arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
 
    # Road surface layer creation
 

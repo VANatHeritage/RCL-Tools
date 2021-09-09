@@ -1,0 +1,73 @@
+NETWORK ANALYST PROCEDURES: Configuring a network dataset in ArcGIS Pro from OpenStreetMap data.
+Prepared by David Bucklin
+Last Edit: 2021-09
+Pre-requisite: a Network Dataset created using ProcOSM.py.
+
+----------------------
+
+Navigate to the Network Dataset (RoadsNet_ND) in ArcGIS Pro, right click -> Properties.
+
+----------------------
+
+Source Settings: Group Connectivity Tab
+All feature classes are in one group.
+    - Roads_Hwy: Highways get endpoint-only connection
+    - Roads_Local: Local roads use any vertex connections
+    - Ramp_Points: Ramp points have Override policy, to make sure the allow connections between the two Highway/Local sources.
+
+----------------------
+
+Travel Attributes: Costs tab
+- Set up a 'DriveMinutes' cost. For evaluators:
+    -   Type: 'Field Script'
+    -   Value: [TT_MIN]
+
+----------------------
+
+Travel Attributes: Restrictions Tab
+- Create a 'DriveNormal' restriction using oneway attribute, usage Prohibited.
+OSM Attribute Note:
+- “F” means that only driving in direction of the line string is allowed.
+- “T” means that only the opposite direction is allowed.
+- “B” (default value) means that both directions are ok.
+
+DriveNormal evaluators:
+- Type: 'Field Script'
+- Prohibited: Python call: nrm(!code!, !oneway!)
+Codeblocks (note different for along and against):
+- codeblock for ALONG:
+def nrm(code, oneway):
+   if code in (5111, 5112, 5113, 5114, 5115, 5121, 5122, 5123, 5131, 5132, 5133, 5134, 5135, 5141, 5142, 5143, 5144, 5145, 5146, 5147):
+      if oneway in ("B","F"):
+         return False
+      else:
+         return True
+   else:
+      return True
+
+- codeblock for AGAINST:
+def nrm(code, oneway):
+   if code in (5111, 5112, 5113, 5114, 5115, 5121, 5122, 5123, 5131, 5132, 5133, 5134, 5135, 5141, 5142, 5143, 5144, 5145, 5146, 5147):
+      if oneway in ("B","T"):
+         return False
+      else:
+         return True
+   else:
+      return True
+
+----------------------
+
+Travel Attributes: Travel Modes tab:
+- Set up a 'Drive' mode.
+    -   Impedance: DriveMinutes
+    -   Restrictions: DriveNormal
+
+----------------------
+
+On General -> Indexes, select the Service-Area Index box. This should improve performance for service area analysis.
+
+----------------------
+
+The final step is to Build the Network. Make sure to do this any time you change the attributes of the network.
+
+==============

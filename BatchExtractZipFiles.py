@@ -18,7 +18,7 @@
 
 # Import required modules
 import zipfile  # for handling zipfiles
-import os  # provides access to operating system funtionality such as file and directory paths
+import os  # provides access to operating system functionality such as file and directory paths
 import sys  # provides access to Python system functions
 import traceback  # used for error handling
 
