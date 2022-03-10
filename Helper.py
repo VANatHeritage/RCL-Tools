@@ -206,6 +206,70 @@ def unique_values(table, field):
    with arcpy.da.SearchCursor(table, [field]) as cursor:
       return sorted({row[0] for row in cursor})
 
+
+def JoinFast(ToTab, ToFld, FromTab, FromFld, JoinFlds):
+   """An alternative to arcpy's JoinField_management for table joins.
+   Uses python dictionary and Search/Update cursors.
+   Tested about 50x faster than arcpy.JoinFields_management for a 500k-row, one-to-one join.
+   Adapted from: https://gis.stackexchange.com/questions/207943/speeding-up-join-in-arcpy
+
+   Note: This function will delete (i.e. overwrite) existing fields from ToTab which match the names of JoinFlds. This
+   differs from JoinField_management, which will alter the new field names (add numeric suffixes).
+
+   ToTab = The table to which fields will be added
+   ToFld = The key field in ToTab, used to match records in FromTab
+   FromTab = The table from which fields will be copied
+   FromFld = the key field in FromTab, used to match records in ToTab
+   JoinFlds = the list of fields to be added
+   """
+
+   if type(JoinFlds) != list:
+      JoinFlds = [JoinFlds]
+   flds_info = [a for a in arcpy.ListFields(FromTab) if a.name in JoinFlds]
+   if len(flds_info) == 0:
+      print('No fields found, no changes made.')
+      return ToTab
+   else:
+      flds = [f.name for f in flds_info]
+      print('Joining [' + ', '.join(flds) + ']...')
+   r = list(range(1, len(JoinFlds) + 1))
+   joindict = {}
+   with arcpy.da.SearchCursor(FromTab, [FromFld] + flds) as rows:
+      for row in rows:
+         joinval = row[0]
+         joindict[joinval] = [row[a] for a in r]
+   del row, rows
+   tFlds = [a.name for a in arcpy.ListFields(ToTab)]
+   # Add fields
+   for j in JoinFlds:
+      ft = [a.type for a in flds_info if a.name == j][0]
+      if j in tFlds:
+         arcpy.DeleteField_management(ToTab, j)
+      if ft == 'String':
+         arcpy.AddField_management(ToTab, j, "TEXT", field_length=8000)
+      elif ft == 'Integer':
+         arcpy.AddField_management(ToTab, j, "LONG")
+      else:
+         arcpy.AddField_management(ToTab, j, "DOUBLE")
+   # Do updates
+   with arcpy.da.UpdateCursor(ToTab, [ToFld] + flds) as recs:
+      for rec in recs:
+         keyval = rec[0]
+         if keyval in joindict:
+            for a in r:
+               rec[a] = joindict[keyval][a - 1]
+            recs.updateRow(rec)
+   del rec, recs
+   return ToTab
+
+
+def copyDomains(inTab, srcTab):
+   print("Assigning domains...")
+   flds = [a for a in arcpy.ListFields(srcTab) if a.domain != '']
+   for f in flds:
+      arcpy.AssignDomainToField_management(inTab, f.name, f.domain)
+   return inTab
+
 ##################################################################################################################
 # Use the main function below to run a function directly from Python IDE or command line with hard-coded variables
 

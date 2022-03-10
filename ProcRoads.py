@@ -1,9 +1,9 @@
 # ---------------------------------------------------------------------------
 # ProcRoads.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
-# Creator: Kirsten R. Hazler
+# Version:  ArcGIS Pro 2.9 / Python 3.x
+# Creator: Kirsten R. Hazler / David Bucklin
 # Creation Date: 2017-10-17 
-# Last Edit: 2019-02-12
+# Last Edit: 2022-03-10
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -61,7 +61,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          else:
             return 0"""
    expression = "Flg(!SEGMENT_EXISTS!,!LOCAL_SPEED_MPH!)"
-   arcpy.CalculateField_management(inRCL, "FlgFld", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(inRCL, "FlgFld", expression, "PYTHON3", codeblock)
 
    # Process: Create and calculate "SPEED_upd" field.
    # This field is used to store speed values to be used in later processing. It allows for altering speed values according to QC criteria, without altering original values in the  existing "LOCAL_SPEED_MPH" field. 
@@ -88,14 +88,14 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:
          return speed"""
    expression = "SpdUpd(!FlgFld!, !MTFCC!, !LOCAL_SPEED_MPH!)"
-   arcpy.CalculateField_management(inRCL, "SPEED_upd", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(inRCL, "SPEED_upd", expression, "PYTHON3", codeblock)
 
    # Process: Create and calculate "TravTime" field
    # This field is used to store the travel time, in minutes, required to travel 1 meter, based on the road speed designation.
    printMsg("Adding and populating 'TravTime' field...")
    arcpy.AddField_management(inRCL, "TravTime", "DOUBLE")
    expression = "0.037/ !SPEED_upd!"
-   arcpy.CalculateField_management(inRCL, "TravTime", expression, "PYTHON_9.3")
+   arcpy.CalculateField_management(inRCL, "TravTime", expression, "PYTHON3")
 
    # Process: Create and calculate the "RmpHwy" field
    # This field indicates if a road is a limited access highway (2), a ramp (1), or any other road type (0)
@@ -109,14 +109,14 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:
          return 0"""
    expression = "RmpHwy(!MTFCC!)"
-   arcpy.CalculateField_management(inRCL, "RmpHwy", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(inRCL, "RmpHwy", expression, "PYTHON3", codeblock)
 
    # Process: Create and calculate the "UniqueID" field
    # This field stores a unique ID with a state prefix for ease of merging data from different states.
    printMsg("Adding and populating 'UniqueID' field...")
    arcpy.AddField_management(inRCL, "UniqueID", "TEXT", "", "", "16")
    expression = "'VA_' +  str(int(!RCL_ID!))"
-   arcpy.CalculateField_management(inRCL, "UniqueID", expression, "PYTHON_9.3")
+   arcpy.CalculateField_management(inRCL, "UniqueID", expression, "PYTHON3")
 
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
@@ -177,7 +177,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:  
          return 3"""
    expression = "Speed(!MTFCC!,!RTTYP!)"
-   arcpy.CalculateField_management(outRoads, "Speed_upd", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(outRoads, "Speed_upd", expression, "PYTHON3", codeblock)
 
    # reduce speeds by 10 mph for road segments intersecting urban areas
    if urbAreas:
@@ -190,7 +190,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
          else:
             return Speed_upd"""
       expression = "Speed(!Speed_upd!)"
-      arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON_9.3", codeblock)
+      arcpy.CalculateField_management(onlyUrb, "Speed_upd", expression, "PYTHON3", codeblock)
       outRoads = arcpy.Merge_management([noUrb, onlyUrb], outRoads + '_urbAdjust')
 
    # Process: Create and calculate "TravTime" field
@@ -198,7 +198,7 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    printMsg("Adding and populating 'TravTime' field...")
    arcpy.AddField_management(outRoads, "TravTime", "DOUBLE")
    expression = "0.037/ !SPEED_upd!"
-   arcpy.CalculateField_management(outRoads, "TravTime", expression, "PYTHON_9.3")
+   arcpy.CalculateField_management(outRoads, "TravTime", expression, "PYTHON3")
 
    # Process: Create and calculate the "RmpHwy" field
    # This field indicates if a road is a limited access highway (2), a ramp (1), or any other road type (0)
@@ -212,14 +212,14 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
       else:
          return 0"""
    expression = "RmpHwy(!MTFCC!)"
-   arcpy.CalculateField_management(outRoads, "RmpHwy", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(outRoads, "RmpHwy", expression, "PYTHON3", codeblock)
 
    # Process: Create and calculate the "UniqueID" field
    # This field stores a unique ID with a state prefix for ease of merging data from different states.
    printMsg("Adding and populating 'UniqueID' field...")
    arcpy.AddField_management(outRoads, "UniqueID", "TEXT", "", "", "30")
    expression = "'TL_' + !LINEARID!"
-   arcpy.CalculateField_management(outRoads, "UniqueID", expression, "PYTHON_9.3")
+   arcpy.CalculateField_management(outRoads, "UniqueID", expression, "PYTHON3")
 
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
@@ -284,7 +284,8 @@ def ExtractRCL_su(inRCL, outRCL):
 
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
    printMsg('Extracting relevant road segments and saving...')
-   arcpy.Select_analysis(inRCL, outRCL, where_clause)
+   # This will maintain domains (Select does not).
+   arcpy.FeatureClassToFeatureClass_conversion(inRCL, os.path.dirname(outRCL), os.path.basename(outRCL), where_clause)
    printMsg('Roads extracted.')
 
    return outRCL
@@ -330,7 +331,8 @@ def PrepRoadsVA_su(inRCL, inVDOT):
    vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
    # JoinFields(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
    # My JoinFields function failed to finish after ~24 hours, so I reverted to using arcpy.JoinField.
-   arcpy.JoinField_management(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   # arcpy.JoinField_management(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
+   JoinFast(inRCL, 'VDOT_EDGE_ID', inVDOT, 'VDOT_EDGE_ID', vdotFields)
 
    # Calculate flag field
    printMsg('Calculating flag field')
@@ -513,7 +515,13 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
    
    This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
    printMsg('Creating road surfaces. This could take awhile...')
-   arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   with arcpy.EnvManager(XYTolerance="0.1 Meters"):
+      # default tolernace is 0.001 meters. Larger tolerances will result in more generalized buffers (fewer vertices)
+      arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
+   # NOTE: Pairwise buffer doesn't have line_end option (defaults to round). Not using.
+   # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
+   printMsg('Running repair...')
+   arcpy.RepairGeometry_management(outSurfaces)
    printMsg('Mission accomplished.')
 
    return outSurfaces
@@ -714,7 +722,8 @@ def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", l
 
 
 def main():
-   # Creating road subset with speed attribute for travel time analysis
+
+   ### Creating road subset with speed attribute for travel time analysis
 
    # first create a new processing database: ...\prep_roads.gdb
    # NOTE: I copied VA_CENTERLINE from the original source gdb to 
@@ -804,7 +813,8 @@ def main():
    arcpy.CreateNetworkDataset_na(os.path.join(rcl, 'RCL'), 'RCL_ND', ls, None)
    # From here on, requires manual settings in ArcGIS pro.
 
-   # Road density
+
+   #### Road density
    arcpy.env.workspace = wd
    inRoads = "all_centerline_urbAdjust"  # r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
@@ -817,20 +827,41 @@ def main():
    CalcRoadDensity(outRoads, inSnap, inMask, outRoadDens)
    # arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
 
-   # Road surface layer creation
+
+   ###. Road surface layer creation
+
+   project = r'D:\projects\RCL\VA_RCL\RCL_2021Q4'
+   wd = project + os.sep + 'RCL_surfaces.gdb'
+   if not arcpy.Exists(wd):
+      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
+   arcpy.env.workspace = wd
+   arcpy.env.overwriteOutput = True
 
    # Set up your variables here
-   # outRCL = r'\outputpath\RCL_subset_20180529'
-   # inVDOT = r'path\to\Virginia_RCL_Dataset_2018Q1.gdb\VDOT_ATTRIBUTE'
-   # outSurfaces = r'outputpath\RCL_subset_20180529\RCL_surfaces'
+   inRCL = 'VA_CENTERLINE_test'
+   inVDOT = 'VDOT_ATTRIBUTE'
+   outRCL = 'RCL_surface_subset_2021Q4_test'
+   outSurfaces = 'VirginiaRoadSurfaces_test'
 
-   # Include the desired function run statement(s) below
-   # PrepRoadsVA_su(outRCL, inVDOT)
-   # AssignBuffer_su(outRCL)
-   # CreateRoadSurfaces_su(outRCL, outSurfaces)
+   # Source geodatabase
+   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2021Q4.gdb'
+   # copy original FC to new GDB
+   # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + os.sep + inRCL)
+   query = "MFIPS = '51760'"  # for testing
+   arcpy.FeatureClassToFeatureClass_conversion(orig_gdb + os.sep + 'VA_CENTERLINE', wd, inRCL, where_clause=query)
+   arcpy.TableToTable_conversion(orig_gdb + os.sep + inVDOT, wd, inVDOT)
+
+   # Road surface workflow
+   ExtractRCL_su(inRCL, outRCL)
+   PrepRoadsVA_su(outRCL, inVDOT)
+   AssignBuffer_su(outRCL)
+   CreateRoadSurfaces_su(outRCL, outSurfaces)
+
+   # Add domains back to road surfaces
+   copyDomains(outSurfaces, inRCL)
+
 
    # End of user input
-
 
 if __name__ == '__main__':
    main()
