@@ -82,19 +82,28 @@ def main():
    arcpy.env.mask = snpRast
    arcpy.env.overwriteOutput = True
 
+   # Roads subset dataset (see ProcRoads.py)
+   inGDB = os.path.join(project, 'roads_proc.gdb')
+   inRoads = os.path.join(inGDB, 'all_subset')
+
+
+   ## Make cost surfaces
+   # NOTE: both surfaces should include ramps (RmpHwy = 1)
    # LAH-only cost surface
-   inRoads = project + os.sep + 'roads_proc.gdb/all_subset_only_lah'
+   roadSub = os.path.join(inGDB, 'all_subset_only_lah')
+   arcpy.Select_analysis(inRoads, roadSub, "RmpHwy <> 0")
    outCostSurf = outGDB + os.sep + 'costSurf_only_lah'
-   CostSurfTravTime(inRoads, snpRast, outCostSurf, bkgdNoData=True)
-
+   CostSurfTravTime(roadSub, snpRast, outCostSurf, bkgdNoData=True)
    # no-LAH cost surface
-   inRoads = project + os.sep + 'roads_proc.gdb/all_subset_no_lah'
+   roadSub = os.path.join(inGDB, 'all_subset_no_lah')
+   arcpy.Select_analysis(inRoads, roadSub, "RmpHwy <> 2")
    outCostSurf = outGDB + os.sep + 'costSurf_no_lah'
-   CostSurfTravTime(inRoads, snpRast, outCostSurf)
+   CostSurfTravTime(roadSub, snpRast, outCostSurf)
 
-   # Make walking cost surface-on local roads only: Walkable roads include everything except LAH/ramps
-   inRoads1 = project + os.sep + 'roads_proc.gdb/all_centerline_urbAdjust'
-   inRoads = project + os.sep + 'roads_proc.gdb/all_centerline_walkable'
+
+   ## Make walking cost surface-on local roads only: Walkable roads include everything except LAH/ramps
+   inRoads1 = os.path.join(inGDB, 'all_centerline_urbAdjust')
+   inRoads = os.path.join(inGDB, 'all_centerline_walkable')
    arcpy.Select_analysis(inRoads1, inRoads, "rmpHwy = 0 AND RTTYP <> 'I'")
    outCostSurf = outGDB + os.sep + 'walkRoads'
    CostSurfTravTime(inRoads, snpRast, outCostSurf, bkgdNoData=True)
@@ -104,7 +113,8 @@ def main():
    # Final walking cost surface raster is: NoData on LAH roads, 3 MPH on all other roads, and 1 MPH in all other areas
    Con(IsNull(outCostSurf), outGDB + os.sep + 'crawl', 0.01233).save(outGDB + os.sep + 'costSurf_walk')
 
-   # clean up
+
+   ## clean up
    garbagePickup([outGDB + os.sep + 'walkRoads', outGDB + os.sep + 'crawl'])
    # Build pyramids for all rasters
    arcpy.BuildPyramidsandStatistics_management(outGDB)

@@ -518,11 +518,13 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces):
    with arcpy.EnvManager(XYTolerance="0.1 Meters"):
       # default tolernace is 0.001 meters. Larger tolerances will result in more generalized buffers (fewer vertices)
       arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
-   # NOTE: Pairwise buffer doesn't have line_end option (defaults to round). Not using.
-   # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
+      # NOTE: Pairwise buffer doesn't have line_end option (defaults to round). Not using.
+      # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
    printMsg('Running repair...')
    arcpy.RepairGeometry_management(outSurfaces)
    printMsg('Mission accomplished.')
+   # Add domains back to road surfaces
+   copyDomains(outSurfaces, inRCL)
 
    return outSurfaces
 
@@ -550,8 +552,11 @@ def RemoveDupRoads(inRoads, outRoads, sort_fld=[["Speed_upd", "DESCENDING"]]):
     - outRoads: Output roads feature class
     - sort_fld: sorting order list, e.g.: [["Field1", "ASCENDING"], ["Field2", "DESCENDING"]]
 
-    Could be added as internal fn to FilterRoad_dens, in place of Dissolve.
-    Uses an ArcPro-only function (CountOverlappingFeatures)"""
+    Used as an internal fn in MakeNetworkDataset_tt.
+    Used as an internal fn in FilterRoad_dens, in place of Dissolve.
+
+    NOTE: Uses an ArcPro-only function (CountOverlappingFeatures)
+    """
 
    # arcpy.Sort_management(inRoads, 'road0', sort_fld)
    # printMsg('Making unique segments for overlapping roads...')
@@ -653,6 +658,8 @@ def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", l
    """
    This functions generates 'ramp points' for use as junctions in a network dataset. It generates
    points at all ramp segment endpoints which intersect a limited access highway or local road.
+
+   Used as an internal fn in MakeNetworkDataset_tt.
    """
 
    lyr_rmp = arcpy.MakeFeatureLayer_management(roads, where_clause=ramp)
@@ -704,6 +711,38 @@ def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", l
 
    return rampPts
 
+
+def MakeNetworkDataset_tt(inRoads, outGDB):
+
+   if not arcpy.Exists(outGDB):
+      print("Creating new geodatabase `" + outGDB + "`.")
+      arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
+
+   # Remove duplicate roads, make ramp points feature class
+   rd_nodup = outGDB + os.sep + 'all_subset_nodup'
+   RemoveDupRoads(inRoads, rd_nodup)
+   # NOTE: use original roads for RampPts, not dup. removed, which may result in extra vertices that get turned into ramp points if used
+   rmp_pts = outGDB + os.sep + "ramp_junctions"
+   RampPts(inRoads, rmp_pts)
+
+   # Make Network GDB and feature dataset
+   fd = os.path.join(outGDB, 'RCL')
+   arcpy.CreateFeatureDataset_management(outGDB, "RCL", arcpy.env.outputCoordinateSystem)
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_limitedAccess", "MTFCC = 'S1100'")
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_ramps", "MTFCC = 'S1630'")
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_local", "MTFCC NOT IN ('S1100', 'S1630')")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_limitedAccess", "junction = 1")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_local", "junction = 2")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "limitedAccess_local", "junction = 3")
+   ls = ["roads_limitedAccess", "roads_ramps", "roads_local", "ramps_limitedAccess", "ramps_local",
+         "limitedAccess_local"]
+
+   # Create Network dataset
+   arcpy.CreateNetworkDataset_na(fd, 'RCL_ND', ls, None)
+   print("Created Network Dataset `" + fd + "`.")
+   return fd
+
+
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
@@ -723,104 +762,63 @@ def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", l
 
 def main():
 
-   ### Creating road subset with speed attribute for travel time analysis
-
-   # first create a new processing database: ...\prep_roads.gdb
-   # NOTE: I copied VA_CENTERLINE from the original source gdb to 
-   # this new geodatabase (prep_roads.gdb) in order to use it, since
-   # it could not be edited in the original gdb.
+   ### Travel Time analysis processing
 
    # set processing (project) folder name and output geodatabase
-   project = r'L:\David\projects\RCL_processing\Tiger_2020'
+   project = r'F:\David\projects\RCL_processing\Tiger_2020'
    wd = project + os.sep + 'roads_proc.gdb'
    if not arcpy.Exists(wd):
       arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
-
-   # process VA roads
-   # orig_VA_CENTERLINE = r'L:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
-   # new FC to create
-   # inRCL = r'VA_CENTERLINE'
-   # copy original FC to working GDB
-   # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + os.sep + inRCL)
-   # note the following step can take hours to complete
-   # PrepRoadsVA_tt(inRCL)
-
-   # process Tiger (non-VA) roads
-   inDir = project + '/data/unzip'  # all non-VA roads shapefiles
-   outRoads = wd + os.sep + 'all_centerline'  # name used when processing Tiger-only
-   urbAreas = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'  # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
-
-   # output coordinate system
-   arcpy.env.outputCoordinateSystem = r'L:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
-   PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=urbAreas)
-   # if manual editing for roads is needed, edit outRoads file
-
-   # Subset roads
    arcpy.env.workspace = wd
 
-   # extract subsets for VA based on MTFCC
+   # Process VA roads (only if using both VA and Tiger datasets).
+   # orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
+   # inRCL = r'VA_CENTERLINE'
+   # arcpy.FeatureClassToFeatureClass_conversion(orig_VA_CENTERLINE, wd, inRCL)
+   # PrepRoadsVA_tt(inRCL)
+   # Subset roads
    # inRCL = 'VA_CENTERLINE'
    # outRCL = 'va_subset'
-   # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
+   # # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
    # where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
-   # arcpy.Select_analysis (inRCL, outRCL, where_clause)
+   # arcpy.Select_analysis(inRCL, outRCL, where_clause)
 
-   # extract driving-only roads subset from non-VA (tiger)
+   # Process Tiger (non-VA) roads
+   arcpy.env.outputCoordinateSystem = r'F:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
+   inDir = project + '/data/unzip'  # all non-VA roads shapefiles
+   outRoads = wd + os.sep + 'all_centerline'  # name used when processing Tiger-only
+   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'  # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
+   PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=urbAreas)
+   # if manual editing for roads is needed, edit the outRoads feature class
+
+   # Output roads subset, excluding pedestrian/private road types, internal census use (S1750)
    inRCL = 'all_centerline_urbAdjust'
    outRCL = 'all_subset'
-   # This isn't really necessary for costdist prep, since all of these roads are assigned a walking speed already. But
-   # should reduce processing time.
-   # note: excludes pedestrian/private road types, internal census use (S1750)
    where_clause = "MTFCC NOT IN ('S1710','S1720','S1730','S1750','S9999','S1820','S1830')"
    arcpy.Select_analysis(inRCL, outRCL, where_clause)
+   # QC check
    unique_values(outRCL, 'Speed_upd')
 
-   # now merge the subsets
-   # inList = [r'va_subset',r'non_va_subset']
+   # Merge the subsets (only if using both VA and Tiger datasets).
+   # inList = [r'va_subset', r'non_va_subset']
    # outRoads = r'all_subset'
-   # now merge
+   # # now merge
    # MergeRoads_tt(inList, outRoads)
 
-   # now export a layer excluding limited access highways (RmpHwy = 2))
-   inRCL = 'all_subset'
-   outRCL = 'all_subset_no_lah'
-   where_clause = "RmpHwy <> 2"
-   arcpy.Select_analysis(inRCL, outRCL, where_clause)
-
-   # now export a layer with ONLY ramps/limited access highways) 
-   # note that both subsets include ramps (RmpHwy = 1)
-   inRCL = 'all_subset'
-   outRCL = 'all_subset_only_lah'
-   where_clause = "RmpHwy <> 0"
-   arcpy.Select_analysis(inRCL, outRCL, where_clause)
-
-   # Make Network dataset feature classes
-   RemoveDupRoads('all_subset', 'all_subset_nodup')
-   RampPts('all_subset', "ramp_junctions")   # NOTE: use original roads for this (not dup. removed, which may result in extra vertices that get turned into ramp points if used)
-   # Make network GDB and feature dataset
-   rcl = project + os.sep + "RCL_Network.gdb"
-   arcpy.CreateFileGDB_management(os.path.dirname(rcl), os.path.basename(rcl))
-   # Make feature dataset and add feature classes
-   arcpy.CreateFeatureDataset_management(rcl, "RCL", arcpy.env.outputCoordinateSystem)
-   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_limitedAccess", "MTFCC = 'S1100'")
-   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_ramps", "MTFCC = 'S1630'")
-   arcpy.FeatureClassToFeatureClass_conversion('all_subset_nodup', os.path.join(rcl, 'RCL'), "roads_local", "MTFCC NOT IN ('S1100', 'S1630')")
-   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "ramps_limitedAccess", "junction = 1")
-   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "ramps_local", "junction = 2")
-   arcpy.FeatureClassToFeatureClass_conversion('ramp_junctions', os.path.join(rcl, 'RCL'), "limitedAccess_local", "junction = 3")
-   ls = ["roads_limitedAccess", "roads_ramps", "roads_local", "ramps_limitedAccess", "ramps_local", "limitedAccess_local"]
-   # Create Network dataset
-   arcpy.CreateNetworkDataset_na(os.path.join(rcl, 'RCL'), 'RCL_ND', ls, None)
-   # From here on, requires manual settings in ArcGIS pro.
+   # Create a travel time Network Dataset
+   inRoads = 'all_subset'
+   outGDB = project + os.sep + "RCL_Network.gdb"
+   MakeNetworkDataset_tt(inRoads, outGDB)
+   # From here on, requires manual settings in ArcGIS pro. See NetworkAnalyst-Setup_Pro.txt.
 
 
-   #### Road density
+   ### Road Density processing
    arcpy.env.workspace = wd
    inRoads = "all_centerline_urbAdjust"  # r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
    outRoads = "roads_filtered"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
-   inSnap = r"L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"  # r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
-   inMask = r"L:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84"  # r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
+   inSnap = r"F:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"  # r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
+   inMask = r"F:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84"  # r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
    outRoadDens = "Roads_kdens_250"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_kdens_250'
 
    FilterRoads_dens(inRoads, selType, outRoads)
@@ -828,7 +826,7 @@ def main():
    # arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
 
 
-   ###. Road surface layer creation
+   ### Road surfaces layer processing
 
    project = r'D:\projects\RCL\VA_RCL\RCL_2021Q4'
    wd = project + os.sep + 'RCL_surfaces.gdb'
@@ -846,19 +844,15 @@ def main():
    # Source geodatabase
    orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2021Q4.gdb'
    # copy original FC to new GDB
-   # arcpy.CopyFeatures_management(orig_VA_CENTERLINE, wd + os.sep + inRCL)
    query = "MFIPS = '51760'"  # for testing
    arcpy.FeatureClassToFeatureClass_conversion(orig_gdb + os.sep + 'VA_CENTERLINE', wd, inRCL, where_clause=query)
    arcpy.TableToTable_conversion(orig_gdb + os.sep + inVDOT, wd, inVDOT)
 
-   # Road surface workflow
+   # Run road surfaces workflow
    ExtractRCL_su(inRCL, outRCL)
    PrepRoadsVA_su(outRCL, inVDOT)
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces)
-
-   # Add domains back to road surfaces
-   copyDomains(outSurfaces, inRCL)
 
 
    # End of user input
