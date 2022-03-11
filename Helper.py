@@ -1,9 +1,9 @@
 # ---------------------------------------------------------------------------
 # Helper.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
-# Creator: Kirsten R. Hazler
+# Version:  ArcGIS Pro / Python 3.x
+# Creator: Kirsten R. Hazler / David Bucklin
 # Creation Date: 2017-10-24 
-# Last Edit: 2017-12-06
+# Last Edit: 2021-03-11
 
 # Summary:
 # Imports standard modules, applies standard settings, and defines a collection of helper functions to be called by other scripts.

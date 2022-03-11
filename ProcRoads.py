@@ -546,7 +546,7 @@ This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazl
 
 
 def RemoveDupRoads(inRoads, outRoads, sort_fld=[["Speed_upd", "DESCENDING"]]):
-   """Duplicate road segement removal from Tiger/Line roads dataset. Retains segment according to the priority
+   """Duplicate road segment removal developed for Tiger/Line roads dataset. Retains segment according to the priority
     in the sort argument (default is to retain highest speed segment). Arguments:
     - inRoads: Input roads. Make sure to filter to subset desired
     - outRoads: Output roads feature class
@@ -557,17 +557,6 @@ def RemoveDupRoads(inRoads, outRoads, sort_fld=[["Speed_upd", "DESCENDING"]]):
 
     NOTE: Uses an ArcPro-only function (CountOverlappingFeatures)
     """
-
-   # arcpy.Sort_management(inRoads, 'road0', sort_fld)
-   # printMsg('Making unique segments for overlapping roads...')
-   # arcpy.CountOverlappingFeatures_analysis("road0", "over0", 2)
-   # # Join one to one (should join with the first record in sorted dataset).
-   # arcpy.SpatialJoin_analysis("over0", "road0", "over1", "JOIN_ONE_TO_ONE", "KEEP_ALL",
-   #                            match_option="SHARE_A_LINE_SEGMENT_WITH")
-   # printMsg('Creating no-duplicates roads dataset...')
-   # arcpy.Erase_analysis(inRoads, "over1", outRoads)
-   # arcpy.Append_management('over1', outRoads, "NO_TEST")
-   # garbagePickup(['road0', 'over0', 'over1'])
 
    printMsg('Making unique segments for overlapping roads...')
    arcpy.CountOverlappingFeatures_analysis(inRoads, "over0")
@@ -809,7 +798,9 @@ def main():
    inRoads = 'all_subset'
    outGDB = project + os.sep + "RCL_Network.gdb"
    MakeNetworkDataset_tt(inRoads, outGDB)
-   # From here on, requires manual settings in ArcGIS pro. See NetworkAnalyst-Setup_Pro.txt.
+   # From here, Network Dataset requires manual settings in ArcGIS pro. See NetworkAnalyst-Setup.txt.
+
+   ### End Travel Time processing
 
 
    ### Road Density processing
@@ -825,9 +816,10 @@ def main():
    CalcRoadDensity(outRoads, inSnap, inMask, outRoadDens)
    # arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
 
+   ### End Road Density processing
+
 
    ### Road surfaces layer processing
-
    project = r'D:\projects\RCL\VA_RCL\RCL_2021Q4'
    wd = project + os.sep + 'RCL_surfaces.gdb'
    if not arcpy.Exists(wd):
@@ -854,8 +846,8 @@ def main():
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces)
 
+   ### End Road surfaces layer processing
 
-   # End of user input
 
 if __name__ == '__main__':
    main()

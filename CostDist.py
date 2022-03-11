@@ -1,9 +1,9 @@
 # ---------------------------------------------------------------------------
 # CostDist.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
-# Creator: Kirsten R. Hazler
+# Version:  ArcGIS Pro / Python 3.x
+# Creator: Kirsten R. Hazler / David Bucklin
 # Creation Date: 2017-10-24 
-# Last Edit: 2018-06-28
+# Last Edit: 2021-03-11
 
 # Summary:
 # A collection of functions for running cost distance analysis based on road speeds.
