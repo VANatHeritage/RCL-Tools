@@ -1,9 +1,9 @@
 # ---------------------------------------------------------------------------
 # ProcRoads.py
-# Version:  ArcGIS Pro 2.9 / Python 3.x
+# Version:  ArcGIS Pro / Python 3.x
 # Creator: Kirsten R. Hazler / David Bucklin
 # Creation Date: 2017-10-17 
-# Last Edit: 2022-03-10
+# Last Edit: 2022-03-11
 
 # Summary:
 # A collection of functions for processing roads data to prepare them as inputs for various analyses.
@@ -15,6 +15,7 @@
 # - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
 # - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
 # - MergeRoads_tt (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
+# - MakeNetworkDataset_tt (to create a new network dataset for travel time analyses, from merged roads dataset)
 # 
 # Use the following function sequence to generate road surfaces from road centerlines:
 # - ExtractRCL_su (to extract the relevant road segments for which you want surfaces generated)
@@ -31,15 +32,15 @@
 from Helper import *
 
 
-def PrepRoadsVA_tt(inRCL):
+def PrepRoadsVA_tt(inRCL, outSubset=None):
    """Prepares a Virginia Road Centerlines (RCL) feature class to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
- - LOCAL_SPEED_MPH
- - MTFCC
- - SEGMENT_EXISTS
- - RCL_ID
- If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
+    - LOCAL_SPEED_MPH
+    - MTFCC
+    - SEGMENT_EXISTS
+    - RCL_ID
+    If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
 
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # Process: Create "SPEED_cmnt" field.
    # This field can be used to store QC comments related to speed, if needed.
@@ -118,17 +119,22 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    expression = "'VA_' +  str(int(!RCL_ID!))"
    arcpy.CalculateField_management(inRCL, "UniqueID", expression, "PYTHON3")
 
+   if outSubset:
+      print("Outputting subset of driving-only roads (" + outSubset + ")...")
+      where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
+      arcpy.Select_analysis(inRCL, outSubset, where_clause)
+
    printMsg("Finished prepping %s." % inRCL)
    return inRCL
 
 
-def PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=None):
+def PrepRoadsTIGER_tt(inDir, outRoads, outSubset=None, inBnd=None, urbAreas=None):
    """Prepares a set of TIGER line shapefiles representing roads to be used for travel time analysis. This function assumes that there already exist some specific fields, including:
-- MTFCC
-- RTTYP
-If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
+   - MTFCC
+   - RTTYP
+   If any of the assumed fields do not exist, have been renamed, or are in the wrong format, the script will fail.
 
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # Process: Merge all roads
    arcpy.env.workspace = inDir
@@ -221,6 +227,11 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
    expression = "'TL_' + !LINEARID!"
    arcpy.CalculateField_management(outRoads, "UniqueID", expression, "PYTHON3")
 
+   if outSubset:
+      print("Outputting subset of driving-only roads (" + outSubset + ")...")
+      where_clause = "MTFCC NOT IN ('S1710','S1720','S1730','S1750','S9999','S1820','S1830')"
+      arcpy.Select_analysis(outRoads, outSubset, where_clause)
+
    printMsg("Finished prepping %s." % outRoads)
    return outRoads
 
@@ -233,7 +244,7 @@ def MergeRoads_tt(inList, outRoads):
    - The input TIGER roads data are the output of running the PrepRoadsTIGER function.
    - The above two inputs are in the same coordinate system.
    
-This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
+   This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler and Tracy Tien for the Development Vulnerability Model (2015)"""
 
    # If input inList is actually a string delimited with semi-colons, need to parse and turn it into a list.
    if isinstance(inList, str):
@@ -257,6 +268,105 @@ This function was adapted from a ModelBuilder tool created by Kirsten R. Hazler 
 
    printMsg("Mission accomplished.")
    return outRoads
+
+
+def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", local="MTFCC NOT IN ('S1100', 'S1630')"):
+   """
+   This functions generates 'ramp points' for use as junctions in a network dataset. It generates
+   points at all ramp segment endpoints which intersect a limited access highway or local road.
+
+   This function was develope for use with Tiger/Line roads.
+
+   Used as an internal fn in MakeNetworkDataset_tt.
+   """
+
+   lyr_rmp = arcpy.MakeFeatureLayer_management(roads, where_clause=ramp)
+   arcpy.FeatureVerticesToPoints_management(lyr_rmp, "r1", "BOTH_ENDS")
+   lyr_rmppt = arcpy.MakeFeatureLayer_management("r1")
+
+   # select ramp points intersecting highways
+   print('Getting junctions of ramps and highway...')
+   lyr_hwy = arcpy.MakeFeatureLayer_management(roads, where_clause=highway)
+   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_hwy)
+   arcpy.CopyFeatures_management(lyr_rmppt, rampPts)
+   arcpy.CalculateField_management(rampPts, "junction", 1, field_type="SHORT")
+
+   ## get "dead end" hwy points (transition from LAH to local road without ramp) points
+   arcpy.Dissolve_management(lyr_hwy, 'hwy_end_diss', "#", "#", "SINGLE_PART", "UNSPLIT_LINES")
+   arcpy.FeatureVerticesToPoints_management("hwy_end_diss", "he1", "BOTH_ENDS")
+   he1 = arcpy.MakeFeatureLayer_management("he1")
+
+   # select those highway ends intersecting with ramps
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp)
+   arcpy.CopyFeatures_management(he1, "hwy_endpts")
+   arcpy.CalculateField_management('hwy_endpts', "junction", 1, field_type="SHORT")
+   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
+
+   # select ramp points intersecting local roads
+   print('Getting junctions of ramps and local...')
+   lyr_loc = arcpy.MakeFeatureLayer_management(roads, where_clause=local)
+   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_loc)
+   arcpy.CopyFeatures_management(lyr_rmppt, 'tmp_ints')
+   arcpy.CalculateField_management('tmp_ints', "junction", 2, field_type="SHORT")
+   # This will append local ramp intersections, then delete those identical to a highway ramp intersection (hwy takes precendence)
+   arcpy.Append_management('tmp_ints', rampPts, "NO_TEST")
+   arcpy.SelectLayerByAttribute_management(lyr_rmppt, "CLEAR_SELECTION")
+
+   # now find highway ends that share endpoint with local roads
+   print('Getting junctions of highway ends and local...')
+   arcpy.SelectLayerByLocation_management(lyr_loc, "BOUNDARY_TOUCHES", "hwy_end_diss")
+   # now select highway end points intersecting those roads
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_loc)
+   # now remove those points intersecting ramps
+   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp, "#", "REMOVE_FROM_SELECTION")
+   arcpy.CopyFeatures_management(he1, "hwy_endpts")
+   arcpy.CalculateField_management('hwy_endpts', "junction", 3, field_type="SHORT")
+   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
+
+   print('Removing duplicate points...')
+   arcpy.DeleteIdentical_management(rampPts, ["Shape"])
+   arcpy.Delete_management(['tmp_ints', "r1", 'hwy_endpts'])
+
+   return rampPts
+
+
+def MakeNetworkDataset_tt(inRoads, outGDB):
+   """
+   :param inRoads: Input raods feature class.
+   :param outGDB: Output geodatabase to hold new 'RCL' feature dataset and 'RCL_ND' network dataset
+   :return: Feature dataset
+
+   This function was developed for a Tiger-only dataset. Would likely need further editing for a VA-only or
+   combined VA+Tiger dataset.
+   """
+
+   if not arcpy.Exists(outGDB):
+      print("Creating new geodatabase `" + outGDB + "`.")
+      arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
+
+   # Remove duplicate roads, make ramp points feature class
+   rd_nodup = outGDB + os.sep + 'all_subset_nodup'
+   RemoveDupRoads(inRoads, rd_nodup)
+   # NOTE: use original roads for RampPts, not dup. removed, which may result in extra vertices that get turned into ramp points if used
+   rmp_pts = outGDB + os.sep + "ramp_junctions"
+   RampPts(inRoads, rmp_pts)
+
+   # Make Network GDB and feature dataset
+   fd = os.path.join(outGDB, 'RCL')
+   arcpy.CreateFeatureDataset_management(outGDB, "RCL", arcpy.env.outputCoordinateSystem)
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_limitedAccess", "MTFCC = 'S1100'")
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_ramps", "MTFCC = 'S1630'")
+   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_local", "MTFCC NOT IN ('S1100', 'S1630')")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_limitedAccess", "junction = 1")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_local", "junction = 2")
+   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "limitedAccess_local", "junction = 3")
+   ls = ["roads_limitedAccess", "roads_ramps", "roads_local", "ramps_limitedAccess", "ramps_local",
+         "limitedAccess_local"]
+
+   # Create Network dataset
+   arcpy.CreateNetworkDataset_na(fd, 'RCL_ND', ls, None)
+   print("Created Network Dataset `" + fd + "`.")
+   return fd
 
 
 def ExtractRCL_su(inRCL, outRCL):
@@ -533,7 +643,7 @@ def CheckConSite_su(inRCL, inFeats, searchDist):
    """Checks if road segment is potentially relevant to ConSite delineation, based on spatial proximity to inFeats,
    and marks records accordingly in the NH_CONSITE field (1 = potentially relevant; 0 = not relevant)
    
-This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
 
    arcpy.MakeFeatureLayer_management(inRCL, "lyrRCL")
    arcpy.SelectLayerByLocation_management("lyrRCL", "WITHIN_A_DISTANCE", inFeats, searchDist, "NEW_SELECTION",
@@ -570,13 +680,13 @@ def RemoveDupRoads(inRoads, outRoads, sort_fld=[["Speed_upd", "DESCENDING"]]):
 
 
 def FilterRoads_dens(inRoads, selType, outRoads):
-   '''Makes a subset of roads to include only those to be used for calculating road density, and removes
+   """Makes a subset of roads to include only those to be used for calculating road density, and removes
    duplicates/overlaps. This function is intended only for use with TIGER data in specific format; otherwise will fail.
    Parameters:
    - inRoads = Input roads from TIGER
    - selType = Type of selection to apply, with options "ALL", "NO_HIGHWAY", "LOCAL"
    - outRoads = Output feature class ready for density processing
-   '''
+   """
 
    # Specify selection query
    if selType == "ALL":
@@ -609,20 +719,20 @@ def FilterRoads_dens(inRoads, selType, outRoads):
 
 def CalcRoadDensity(inRoads, inSnap, inMask, outRoadDens, sRadius=250, outUnits="SQUARE_KILOMETERS",
                     outVals="DENSITIES"):
-   '''Creates a kernel density surface from input roads.
+   """Creates a kernel density surface from input roads.
    Parameters:
    - inRoads = Input lines feature class representing roads
    - inSnap = Snap raster used to specify the output coordinate system, cell size, and cell alignment
-   - inMask = Feature class or raster used to specify processing extent and mask 
+   - inMask = Feature class or raster used to specify processing extent and mask
    - outRoadDens = Output raster representing road density
    - sRadius = The search radius within which to calculate density. Units are based on the linear unit of the
       projection of the output spatial reference.
    - outUnits = The desired area units of the output density values.
    - outVals = Determines what the values in the output raster represent. Options: DENSITIES or EXPECTED_COUNTS
-   
+
    NOTE: If input coordinate system units are meters, and outUnits are SQUARE_KILOMETERS, the output densities are km
    per square km. It gets difficult to intuitively interpret using other units.
-   '''
+   """
 
    arcpy.env.snapRaster = inSnap
    arcpy.env.cellSize = inSnap
@@ -643,95 +753,6 @@ def CalcRoadDensity(inRoads, inSnap, inMask, outRoadDens, sRadius=250, outUnits=
    return outRoadDens
 
 
-def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", local="MTFCC NOT IN ('S1100', 'S1630')"):
-   """
-   This functions generates 'ramp points' for use as junctions in a network dataset. It generates
-   points at all ramp segment endpoints which intersect a limited access highway or local road.
-
-   Used as an internal fn in MakeNetworkDataset_tt.
-   """
-
-   lyr_rmp = arcpy.MakeFeatureLayer_management(roads, where_clause=ramp)
-   arcpy.FeatureVerticesToPoints_management(lyr_rmp, "r1", "BOTH_ENDS")
-   lyr_rmppt = arcpy.MakeFeatureLayer_management("r1")
-
-   # select ramp points intersecting highways
-   print('Getting junctions of ramps and highway...')
-   lyr_hwy = arcpy.MakeFeatureLayer_management(roads, where_clause=highway)
-   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_hwy)
-   arcpy.CopyFeatures_management(lyr_rmppt, rampPts)
-   arcpy.CalculateField_management(rampPts, "junction", 1, field_type="SHORT")
-
-   ## get "dead end" hwy points (transition from LAH to local road without ramp) points
-   arcpy.Dissolve_management(lyr_hwy, 'hwy_end_diss', "#", "#", "SINGLE_PART", "UNSPLIT_LINES")
-   arcpy.FeatureVerticesToPoints_management("hwy_end_diss", "he1", "BOTH_ENDS")
-   he1 = arcpy.MakeFeatureLayer_management("he1")
-
-   # select those highway ends intersecting with ramps
-   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp)
-   arcpy.CopyFeatures_management(he1, "hwy_endpts")
-   arcpy.CalculateField_management('hwy_endpts', "junction", 1, field_type="SHORT")
-   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
-
-   # select ramp points intersecting local roads
-   print('Getting junctions of ramps and local...')
-   lyr_loc = arcpy.MakeFeatureLayer_management(roads, where_clause=local)
-   arcpy.SelectLayerByLocation_management(lyr_rmppt, "INTERSECT", lyr_loc)
-   arcpy.CopyFeatures_management(lyr_rmppt, 'tmp_ints')
-   arcpy.CalculateField_management('tmp_ints', "junction", 2, field_type="SHORT")
-   # This will append local ramp intersections, then delete those identical to a highway ramp intersection (hwy takes precendence)
-   arcpy.Append_management('tmp_ints', rampPts, "NO_TEST")
-   arcpy.SelectLayerByAttribute_management(lyr_rmppt, "CLEAR_SELECTION")
-
-   # now find highway ends that share endpoint with local roads
-   print('Getting junctions of highway ends and local...')
-   arcpy.SelectLayerByLocation_management(lyr_loc, "BOUNDARY_TOUCHES", "hwy_end_diss")
-   # now select highway end points intersecting those roads
-   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_loc)
-   # now remove those points intersecting ramps
-   arcpy.SelectLayerByLocation_management(he1, "INTERSECT", lyr_rmp, "#", "REMOVE_FROM_SELECTION")
-   arcpy.CopyFeatures_management(he1, "hwy_endpts")
-   arcpy.CalculateField_management('hwy_endpts', "junction", 3, field_type="SHORT")
-   arcpy.Append_management('hwy_endpts', rampPts, "NO_TEST")
-
-   print('Removing duplicate points...')
-   arcpy.DeleteIdentical_management(rampPts, ["Shape"])
-   arcpy.Delete_management(['tmp_ints', "r1", 'hwy_endpts'])
-
-   return rampPts
-
-
-def MakeNetworkDataset_tt(inRoads, outGDB):
-
-   if not arcpy.Exists(outGDB):
-      print("Creating new geodatabase `" + outGDB + "`.")
-      arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
-
-   # Remove duplicate roads, make ramp points feature class
-   rd_nodup = outGDB + os.sep + 'all_subset_nodup'
-   RemoveDupRoads(inRoads, rd_nodup)
-   # NOTE: use original roads for RampPts, not dup. removed, which may result in extra vertices that get turned into ramp points if used
-   rmp_pts = outGDB + os.sep + "ramp_junctions"
-   RampPts(inRoads, rmp_pts)
-
-   # Make Network GDB and feature dataset
-   fd = os.path.join(outGDB, 'RCL')
-   arcpy.CreateFeatureDataset_management(outGDB, "RCL", arcpy.env.outputCoordinateSystem)
-   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_limitedAccess", "MTFCC = 'S1100'")
-   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_ramps", "MTFCC = 'S1630'")
-   arcpy.FeatureClassToFeatureClass_conversion(rd_nodup, fd, "roads_local", "MTFCC NOT IN ('S1100', 'S1630')")
-   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_limitedAccess", "junction = 1")
-   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "ramps_local", "junction = 2")
-   arcpy.FeatureClassToFeatureClass_conversion(rmp_pts, fd, "limitedAccess_local", "junction = 3")
-   ls = ["roads_limitedAccess", "roads_ramps", "roads_local", "ramps_limitedAccess", "ramps_local",
-         "limitedAccess_local"]
-
-   # Create Network dataset
-   arcpy.CreateNetworkDataset_na(fd, 'RCL_ND', ls, None)
-   print("Created Network Dataset `" + fd + "`.")
-   return fd
-
-
 ############################################################################
 
 # Use the section below to enable a function (or sequence of functions) to be run directly from this free-standing script (i.e., not as an ArcGIS toolbox tool)
@@ -741,61 +762,43 @@ def MakeNetworkDataset_tt(inRoads, outGDB):
 # - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
 # - PrepRoadsTIGER_tt (to prepare TIGER roads data from adjacent states for travel time analysis)
 # - MergeRoads_tt (to merge the RCL and TIGER datasets into a seamless dataset, with a limited set of critical fields in the output)
+# - MakeNetworkDataset_tt (to create a new network dataset for travel time analyses, from merged roads dataset)
 # 
 # Use the following function sequence to generate road surfaces from road centerlines:
 # - ExtractRCL_su (to extract the relevant road segments for which you want surfaces generated)
 # - PrepRoadsVA_su (to add necessary fields to roads data)
 # - AssignBuffer_su (to assign road surface buffer widths)
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
+#
+# Use the following function sequence to generate road density from TIGER road centerlines:
+# - FilterRoads_dens (filter roads according to selction, removes overlapping segments)
+# - CalcRoadDensity (to calculate a road density surface)
 
 
 def main():
 
-   ### Travel Time analysis processing
+   # The three workflows (Travel Time, Road Surfaces, and Road Density) are demonstrated below.
+   # Change the inputs as needed to run a new analysis.
 
-   # set processing (project) folder name and output geodatabase
+   ### Travel Time processing with Tiger only
+   # set project folder name and create project geodatabase
    project = r'F:\David\projects\RCL_processing\Tiger_2020'
    wd = project + os.sep + 'roads_proc.gdb'
    if not arcpy.Exists(wd):
       arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
    arcpy.env.workspace = wd
-
-   # Process VA roads (only if using both VA and Tiger datasets).
-   # orig_VA_CENTERLINE = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2018Q3.gdb\VA_CENTERLINE'
-   # inRCL = r'VA_CENTERLINE'
-   # arcpy.FeatureClassToFeatureClass_conversion(orig_VA_CENTERLINE, wd, inRCL)
-   # PrepRoadsVA_tt(inRCL)
-   # Subset roads
-   # inRCL = 'VA_CENTERLINE'
-   # outRCL = 'va_subset'
-   # # note: excludes pedestrian/private road types, and ferry routes (segment_type = 50).
-   # where_clause = "MTFCC NOT IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740','S1820', 'S1830', 'S1500') AND SEGMENT_TYPE NOT IN (50)"
-   # arcpy.Select_analysis(inRCL, outRCL, where_clause)
-
-   # Process Tiger (non-VA) roads
    arcpy.env.outputCoordinateSystem = r'F:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
-   inDir = project + '/data/unzip'  # all non-VA roads shapefiles
-   outRoads = wd + os.sep + 'all_centerline'  # name used when processing Tiger-only
-   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'  # used to reduce speeds >30mph by 10 mph. Fixed to 2018 data
-   PrepRoadsTIGER_tt(inDir, outRoads, inBnd=None, urbAreas=urbAreas)
-   # if manual editing for roads is needed, edit the outRoads feature class
 
-   # Output roads subset, excluding pedestrian/private road types, internal census use (S1750)
-   inRCL = 'all_centerline_urbAdjust'
-   outRCL = 'all_subset'
-   where_clause = "MTFCC NOT IN ('S1710','S1720','S1730','S1750','S9999','S1820','S1830')"
-   arcpy.Select_analysis(inRCL, outRCL, where_clause)
-   # QC check
-   unique_values(outRCL, 'Speed_upd')
-
-   # Merge the subsets (only if using both VA and Tiger datasets).
-   # inList = [r'va_subset', r'non_va_subset']
-   # outRoads = r'all_subset'
-   # # now merge
-   # MergeRoads_tt(inList, outRoads)
+   # Process Tiger roads for travel time
+   inDir = project + '/data/unzip'
+   outRoads = wd + os.sep + 'all_centerline'
+   outSubsetTiger = 'all_subset'
+   # Urban areas are used to reduce speeds on >30mph roads by 10 mph. Fixed to 2018 dataset
+   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'
+   PrepRoadsTIGER_tt(inDir, outRoads, outSubsetTiger, inBnd=None, urbAreas=urbAreas)
 
    # Create a travel time Network Dataset
-   inRoads = 'all_subset'
+   inRoads = outSubsetTiger
    outGDB = project + os.sep + "RCL_Network.gdb"
    MakeNetworkDataset_tt(inRoads, outGDB)
    # From here, Network Dataset requires manual settings in ArcGIS pro. See NetworkAnalyst-Setup.txt.
@@ -803,8 +806,36 @@ def main():
    ### End Travel Time processing
 
 
-   ### Road Density processing
+   ### Road Surfaces processing
+   project = r'D:\projects\RCL\VA_RCL\RCL_2021Q4'
+   wd = project + os.sep + 'RCL_surfaces.gdb'
+   if not arcpy.Exists(wd):
+      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
    arcpy.env.workspace = wd
+   arcpy.env.overwriteOutput = True
+
+   # Set up your variables here
+   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2021Q4.gdb'
+   inRCL = 'VA_CENTERLINE'
+   inVDOT = 'VDOT_ATTRIBUTE'
+   outRCL = 'RCL_surface_subset'
+   outSurfaces = 'VirginiaRoadSurfaces'
+
+   # Copy original feature class, table to project GDB
+   arcpy.FeatureClassToFeatureClass_conversion(orig_gdb + os.sep + 'VA_CENTERLINE', wd, inRCL)
+   arcpy.TableToTable_conversion(orig_gdb + os.sep + inVDOT, wd, inVDOT)
+
+   # Run road surfaces workflow
+   ExtractRCL_su(inRCL, outRCL)
+   PrepRoadsVA_su(outRCL, inVDOT)
+   AssignBuffer_su(outRCL)
+   CreateRoadSurfaces_su(outRCL, outSurfaces)
+
+   ### End Road surfaces processing
+
+
+   ### Road Density processing
+   arcpy.env.workspace = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb'
    inRoads = "all_centerline_urbAdjust"  # r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
    outRoads = "roads_filtered"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
@@ -817,36 +848,6 @@ def main():
    # arcpy.sa.SetNull(outRoadDens, outRoadDens, "Value <= 0").save("Roads_kdens_250_noZero")
 
    ### End Road Density processing
-
-
-   ### Road surfaces layer processing
-   project = r'D:\projects\RCL\VA_RCL\RCL_2021Q4'
-   wd = project + os.sep + 'RCL_surfaces.gdb'
-   if not arcpy.Exists(wd):
-      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
-   arcpy.env.workspace = wd
-   arcpy.env.overwriteOutput = True
-
-   # Set up your variables here
-   inRCL = 'VA_CENTERLINE_test'
-   inVDOT = 'VDOT_ATTRIBUTE'
-   outRCL = 'RCL_surface_subset_2021Q4_test'
-   outSurfaces = 'VirginiaRoadSurfaces_test'
-
-   # Source geodatabase
-   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2021Q4.gdb'
-   # copy original FC to new GDB
-   query = "MFIPS = '51760'"  # for testing
-   arcpy.FeatureClassToFeatureClass_conversion(orig_gdb + os.sep + 'VA_CENTERLINE', wd, inRCL, where_clause=query)
-   arcpy.TableToTable_conversion(orig_gdb + os.sep + inVDOT, wd, inVDOT)
-
-   # Run road surfaces workflow
-   ExtractRCL_su(inRCL, outRCL)
-   PrepRoadsVA_su(outRCL, inVDOT)
-   AssignBuffer_su(outRCL)
-   CreateRoadSurfaces_su(outRCL, outSurfaces)
-
-   ### End Road surfaces layer processing
 
 
 if __name__ == '__main__':
