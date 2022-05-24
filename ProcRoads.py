@@ -391,12 +391,25 @@ def ExtractRCL_su(inRCL, outRCL):
    - 50: Ferry Crossing
 
    This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
-
    where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
-   printMsg('Extracting relevant road segments and saving...')
-   # This will maintain domains (Select does not).
-   arcpy.FeatureClassToFeatureClass_conversion(inRCL, os.path.dirname(outRCL), os.path.basename(outRCL), where_clause)
-   printMsg('Roads extracted.')
+   
+   printMsg('Copying roads...')
+   arcpy.FeatureClassToFeatureClass_conversion(inRCL, os.path.dirname(outRCL), os.path.basename(outRCL))
+
+   printMsg('Adding NH_IGNORE...')
+   arcpy.AddField_management(outRCL, 'NH_IGNORE', 'SHORT')
+   domName = "NH_IGNORE"
+   arcpy.CreateDomain_management(os.path.dirname(outRCL), domName, "Ignore for Consite delineation?", "SHORT", "CODED")
+   domDict = {0: "Use", 1: "Ignore"}
+   for code in domDict:
+      arcpy.AddCodedValueToDomain_management(os.path.dirname(outRCL), domName, code, domDict[code])
+   arcpy.AssignDomainToField_management(outRCL, "NH_IGNORE", domName)
+   # Update NH_IGNORE
+   lyr = arcpy.MakeFeatureLayer_management(outRCL)
+   arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where_clause, invert_where_clause=True)
+   arcpy.CalculateField_management(lyr, 'NH_IGNORE', "1")
+   del lyr
+   # Coulddo: compare/update existing ignore/use from feature service.
 
    return outRCL
 
@@ -830,6 +843,8 @@ def main():
    PrepRoadsVA_su(outRCL, inVDOT)
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces)
+   # Headsup: the NH_IGNORE should be updated to reflect changes made in the current road surfaces layer (NH_IGNORE = 1)
+   #  which is manually edited in AGOL.
 
    ### End Road surfaces processing
 

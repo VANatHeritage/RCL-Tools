@@ -26,6 +26,94 @@ from ProcRoads import CalcRoadDensity
 arcpy.env.overwriteOutput = True
 
 
+def mergeTiles(projName):
+   """
+   :param projName: Name for output merged GDB and dataset
+   :return: feature class
+   """
+   # tileGDB = r'L:\David\GIS_data\OSM\osmdata.tileGDB'
+   # projName = 'VA_50mile'
+
+   dt = time.strftime('%Y%m%d')
+
+   # get project FCs
+   ls = arcpy.ListFeatureClasses(projName + '_osm_line_*')
+   bound = arcpy.ListFeatureClasses(projName + '_features_*')[0]
+   # grid = arcpy.ListFeatureClasses(projName + '_grid_*')[0]
+
+   # set environments
+   arcpy.env.extent = bound
+   arcpy.env.outputCoordinateSystem = bound
+   arcpy.env.overwriteOutput = True
+
+   # make new tileGDB with timestamp
+   proj_gdb = os.getcwd() + os.sep + projName + '_' + dt + '.tileGDB'
+   if not arcpy.Exists(proj_gdb):
+      print('Creating geodatabase `' + proj_gdb + '`...')
+      arcpy.CreateFileGDB_management(os.path.dirname(proj_gdb), os.path.basename(proj_gdb))
+
+   # initiate new feature class
+   out = proj_gdb + os.sep + projName + '_osm_line'
+   arcpy.CopyFeatures_management(ls[0], out)
+
+   # coulddo: use merge? Might cause issues with memory/processing
+   ls2 = ls[1:]
+   print('Appending tiles to output dataset...')
+   for i in ls2:
+      print(i)
+      arcpy.Append_management(i, out, "NO_TEST")
+
+   # Clean up final dataset
+   print('Deleting identical road segments...')
+   arcpy.AddSpatialIndex_management(out)
+   arcpy.DeleteIdentical_management(out, ['Shape'])  # Can take 15-30 minutes. # osm_id?
+   arcpy.Compact_management(proj_gdb)
+
+   return out
+
+
+def prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads):
+   """
+   For merging multiple states' OSM streets data from Geofabrik.
+   inFC: Virginia feature class
+   appendFC: list of all other states' feature classes
+   boundary: feature class used as (coord system, extent, clip).
+   urbanAreas: census urban areas feature class, used to assign attribute UA (1=in UA, 0=not in UA)
+   outRoads: merged feature class
+   """
+   arcpy.env.outputCoordinateSystem = boundary
+   arcpy.env.extent = boundary
+   wd = os.path.dirname(outRoads)
+
+   print('Creating merged feature class...')
+   arcpy.FeatureClassToFeatureClass_conversion(inFC, wd, os.path.basename(outRoads))
+   for i in appendFC:
+      print(i)
+      arcpy.Clip_analysis(i, boundary, wd + os.sep + 'rd2')
+      arcpy.Append_management(wd + os.sep + 'rd2', outRoads, "NO_TEST")
+   # delete identical by osm_id (border roads are included in both state datasets)
+   arcpy.GetCount_management(outRoads)
+   arcpy.DeleteIdentical_management(outRoads, ['osm_id'])
+
+   # use a selection to attribute UA, so not to alter original geometry (e.g. erase or identity), which can mess with
+   # connectivity for Network Analyst.
+   print('Identifying roads in urban areas...')
+   lyr = arcpy.MakeFeatureLayer_management(outRoads)
+   arcpy.SelectLayerByLocation_management(lyr, 'HAVE_THEIR_CENTER_IN', urbanAreas)
+   fld = 'UA'
+   efld = [a.name for a in arcpy.ListFields(outRoads)]
+   if fld not in efld:
+      arcpy.AddField_management(outRoads, fld, 'SHORT')
+   arcpy.CalculateField_management(lyr, fld, '1')
+   arcpy.SelectLayerByAttribute_management(lyr, 'SWITCH_SELECTION')
+   arcpy.CalculateField_management(lyr, fld, '0')
+   del lyr
+
+   # clean up
+   arcpy.Delete_management([wd + os.sep + 'rd2'])
+   return outRoads
+
+
 def rmpHwy(code):
    # Internal fn for attributeOSM
    if code == 5111:
@@ -107,122 +195,15 @@ def tt(length_m, speed_mph):
    return t
 
 
-def mergeTiles(projName):
-   '''
-   :param projName: Name for output merged GDB and dataset
-   :return: feature class
-   '''
-   # tileGDB = r'L:\David\GIS_data\OSM\osmdata.tileGDB'
-   # projName = 'VA_50mile'
-
-   dt = time.strftime('%Y%m%d')
-
-   # get project FCs
-   ls = arcpy.ListFeatureClasses(projName + '_osm_line_*')
-   bound = arcpy.ListFeatureClasses(projName + '_features_*')[0]
-   # grid = arcpy.ListFeatureClasses(projName + '_grid_*')[0]
-
-   # set environments
-   arcpy.env.extent = bound
-   arcpy.env.outputCoordinateSystem = bound
-   arcpy.env.overwriteOutput = True
-
-   # make new tileGDB with timestamp
-   proj_gdb = os.getcwd() + os.sep + projName + '_' + dt + '.tileGDB'
-   if not arcpy.Exists(proj_gdb):
-      print('Creating geodatabase `' + proj_gdb + '`...')
-      arcpy.CreateFileGDB_management(os.path.dirname(proj_gdb), os.path.basename(proj_gdb))
-
-   # initiate new feature class
-   out = proj_gdb + os.sep + projName + '_osm_line'
-   arcpy.CopyFeatures_management(ls[0], out)
-
-   # coulddo: use merge? Might cause issues with memory/processing
-   ls2 = ls[1:]
-   print('Appending tiles to output dataset...')
-   for i in ls2:
-      print(i)
-      arcpy.Append_management(i, out, "NO_TEST")
-
-   # Clean up final dataset
-   print('Deleting identical road segments...')
-   arcpy.AddSpatialIndex_management(out)
-   arcpy.DeleteIdentical_management(out, ['Shape'])  # Can take 15-30 minutes. # osm_id?
-   arcpy.Compact_management(proj_gdb)
-
-   return out
-
-
-def prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads):
-   '''
-   For merging multiple states' OSM streets data from Geofabrik.
-   inFC: Virginia feature class
-   appendFC: list of all other states' feature classes
-   boundary: feature class used as (coord system, extent, clip).
-   urbanAreas: census urban areas feature class, used to assign attribute UA (1=in UA, 0=not in UA)
-   outRoads: merged feature class
-   '''
-   arcpy.env.outputCoordinateSystem = boundary
-   arcpy.env.extent = boundary
-   wd = os.path.dirname(outRoads)
-
-   print('Creating merged feature class...')
-   arcpy.FeatureClassToFeatureClass_conversion(inFC, wd, os.path.basename(outRoads))
-   for i in appendFC:
-      print(i)
-      arcpy.Clip_analysis(i, boundary, wd + os.sep + 'rd2')
-      arcpy.Append_management(wd + os.sep + 'rd2', outRoads, "NO_TEST")
-   # delete identical by osm_id (border roads are included in both state datasets)
-   arcpy.GetCount_management(outRoads)
-   arcpy.DeleteIdentical_management(outRoads, ['osm_id'])
-
-   # DEPRECATED: abandoned this, as altering geometry can mess up connectivity for Network analyst
-   # print('Identifying urban areas...')
-   # arcpy.Identity_analysis(outRoads + '_orig', urbanAreas,
-   #                         wd + os.sep + 'rd2', join_attributes="ONLY_FID")
-   # # NOTE: Convert to single-part, as multi-part roads created by identity can cause issues with a network dataset.
-   # arcpy.MultipartToSinglepart_management(wd + os.sep + 'rd2', outRoads)
-
-   # use a selection to attribute UA, so not to alter original geometry (e.g. erase or identity), which can mess up Network Analyst.
-   print('Identifying roads in urban areas...')
-   lyr = arcpy.MakeFeatureLayer_management(outRoads)
-   arcpy.SelectLayerByLocation_management(lyr, 'HAVE_THEIR_CENTER_IN', urbanAreas)
-   fld = 'UA'
-   efld = [a.name for a in arcpy.ListFields(outRoads)]
-   if fld not in efld:
-      arcpy.AddField_management(outRoads, fld, 'SHORT')
-   arcpy.CalculateField_management(lyr, fld, '1')
-   arcpy.SelectLayerByAttribute_management(lyr, 'SWITCH_SELECTION')
-   arcpy.CalculateField_management(lyr, fld, '0')
-   del lyr
-
-   # DEPRECATED
-   # fld = 'UA'
-   # efld = [a.name for a in arcpy.ListFields(outRoads)]
-   # if fld not in efld:
-   #    arcpy.AddField_management(outRoads, fld, 'SHORT')
-   # with arcpy.da.UpdateCursor(outRoads, ['FID_' + os.path.basename(urbanAreas), fld]) as curs:
-   #    for i in curs:
-   #       if i[0] == -1:
-   #          i[1] = 0
-   #       else:
-   #          i[1] = 1
-   #       curs.updateRow(i)
-
-   # clean up
-   arcpy.Delete_management([wd + os.sep + 'rd2'])
-   return outRoads
-
-
 def attributeOSM(inRoads):
-   '''
+   """
    Attribute calculations:
    1. assign 'RmpHwy' field (Highway=2, Ramp=1, other roads=0)
    2. add SPEED_MPH field
    3. add TT_MIN field
    Note: uses internal functions from helper.py to calculate fields.
    Calcuations done using UpdateCursor for faster performance.
-   '''
+   """
    efld = [a.name for a in arcpy.ListFields(inRoads)]
 
    print('Assigning ramp/highway designations...')
@@ -306,7 +287,7 @@ def main():
       arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
    arcpy.env.workspace = outGDB
 
-   # Make Network GDB
+   ### BEGIN Network Dataset prep
    netGDB = r'E:\projects\OSM\network\OSM_RoadsNet_Albers.gdb'
    if not arcpy.Exists(netGDB):
       arcpy.CreateFileGDB_management(os.path.dirname(netGDB), os.path.basename(netGDB))
@@ -324,13 +305,13 @@ def main():
    # Merged feature class to create
    outRoads = outGDB + os.sep + 'OSM_Roads_' + dt
 
-   # END HEADER
-
    # Create merged dataset with UA, speed and travel time attributes
    prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads)
    attributeOSM(outRoads)
    # Make a network GDB, dataset
    makeNetworkDataset(outRoads, netGDB)
+
+   ### END Network Dataset prep
 
 
    # Additional processes below (Not needed for network dataset)
@@ -345,6 +326,7 @@ def main():
    rdlyr = arcpy.MakeFeatureLayer_management(inRoads, where_clause="code IN (5111, 5112, 5113, 5114, 5115, 5121, 5122, 5123, 5131, 5132, 5133, 5134, 5135, 5141, 5142, 5143, 5144, 5145, 5146, 5147)")
    arcpy.PairwiseBuffer_analysis(rdlyr, inRoads + '_qtrMileBuff', "0.25 Miles", dissolve_option="ALL")
    del rdlyr
+
    # Make a mask out of buffered roads
    with arcpy.EnvManager(cellSize=inSnap, snapRaster=inSnap, extent=inSnap, outputCoordinateSystem=inSnap):
       arcpy.PolygonToRaster_conversion(inRoads + '_qtrMileBuff', 'OBJECTID', inRoads + '_qtrMileBuff_rast', cellsize=inSnap)
