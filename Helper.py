@@ -265,7 +265,8 @@ def JoinFast(ToTab, ToFld, FromTab, FromFld, JoinFlds):
 
 def copyDomains(inTab, srcTab):
    print("Assigning domains...")
-   flds = [a for a in arcpy.ListFields(srcTab) if a.domain != '']
+   in_flds = [a.name for a in arcpy.ListFields(inTab)]
+   flds = [a for a in arcpy.ListFields(srcTab) if a.name in in_flds and a.domain != '']
    for f in flds:
       arcpy.AssignDomainToField_management(inTab, f.name, f.domain)
    return inTab

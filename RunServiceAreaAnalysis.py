@@ -70,7 +70,7 @@ defQuery = '"%s" in %s' %(fld, valString)
 fac_lyr.definitionQuery = defQuery
 
 # how many sources?
-print 'Facilities count: ' + str(arcpy.GetCount_management("fac"))
+print('Facilities count: ' + str(arcpy.GetCount_management("fac")))
 
 # Make service area layer 
 outNALayer = arcpy.na.MakeServiceAreaLayer(in_network_dataset=inNetworkDataset,
