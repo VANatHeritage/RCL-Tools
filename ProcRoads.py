@@ -368,59 +368,13 @@ def MakeNetworkDataset_tt(inRoads, outGDB):
    return fd
 
 
-def ExtractRCL_su(inRCL, outRCL):
-   """Extracts the relevant features from the Virginia Road Centerlines (RCL) feature class to be used for creating
-   road surfaces. Omits segments based on data in the MTFCC and SEGMENT_TYPE fields. If any of the assumed fields do
-   not exist, have been renamed, or are in the wrong format, the script will fail.
-   
-   Excludes the following MTFCC types:
-   - S1730: Alleys
-   - S1780: Parking Lot Roads
-   - S9999: Driveways
-   - S1710: Walkways/Pedestrian Trails
-   - S1720: Stairways
-   - S1740: Service Vehicle Private Drives
-   - S1820: Bike Paths or Trails
-   - S1830: Bridle Paths
-   - S1500: 4WD Vehicular Trails
-
-   Excludes the following SEGMENT_TYPE values:
-   - 2: Bridge/Overpass
-   - 10: Tunnel/Underpass
-   - 50: Ferry Crossing
-
-   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell
-   DEPRECATED: since no longer extracting roads, moved processes from here to PrepRoadsVA_su. Do not use this function.
-   """
-   printMsg('Copying roads...')
-   arcpy.FeatureClassToFeatureClass_conversion(inRCL, os.path.dirname(outRCL), os.path.basename(outRCL))
-
-   printMsg('Adding NH_IGNORE...')
-   arcpy.AddField_management(outRCL, 'NH_IGNORE', 'SHORT')
-   domName = "NH_IGNORE"
-   arcpy.CreateDomain_management(os.path.dirname(outRCL), domName, "Ignore for ConSite delineation?", "SHORT", "CODED")
-   domDict = {0: "Use", 1: "Ignore"}
-   for code in domDict:
-      arcpy.AddCodedValueToDomain_management(os.path.dirname(outRCL), domName, code, domDict[code])
-   arcpy.AssignDomainToField_management(outRCL, "NH_IGNORE", domName)
-
-   printMsg("Updating NH_IGNORE...")
-   where_clause = "MTFCC NOT IN ( 'S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500' ) AND SEGMENT_TYPE NOT IN (2, 10, 50)"
-   lyr = arcpy.MakeFeatureLayer_management(outRCL)
-   arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where_clause, invert_where_clause=True)
-   arcpy.CalculateField_management(lyr, 'NH_IGNORE', "1")
-   del lyr
-
-   return outRCL
-
-
 def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    """Adds fields to road centerlines data, necessary for generating road surfaces.
    - inRCL = road centerlines feature class
    - inVDOT = VDOT attribute table (from same geodatabase as inRCL)
    - outRCL = Copy of inRCL with fields added for road surfaces
 
-   Sets NH_IGNORE = 1 for the following MTFCC types:
+   Once fields added, sets NH_IGNORE = 2 for the following MTFCC types:
    - S1730: Alleys
    - S1780: Parking Lot Roads
    - S9999: Driveways
@@ -431,7 +385,7 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    - S1830: Bridle Paths
    - S1500: 4WD Vehicular Trails
 
-   Sets NH_IGNORE = 1 for the following SEGMENT_TYPE values:
+   Also sets NH_IGNORE = 2 for the following SEGMENT_TYPE values:
    - 2: Bridge/Overpass
    - 10: Tunnel/Underpass
    - 50: Ferry Crossing
@@ -456,14 +410,13 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
          self.Length = Length
 
    # Specify fields to add
-   printMsg('Setting field definitions')
-   # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage   
+   # All field names have the prefix "NH" to indicate they are fields added by Natural Heritage
    fldBuffM = Field('NH_BUFF_M', 'DOUBLE', '')  # Buffer width in meters. This field is calculated automatically based on information in other fields.
    fldFlag = Field('NH_SURFWIDTH_FLAG', 'SHORT', '')  # Flag for surface widths needing attention. This field is automatically calculated initially, but can be manually changed as needed (-1 = needs attention; 0 = OK; 1 = record reviewed and amended)
    fldComments = Field('NH_COMMENTS', 'TEXT', 500)  # QC/processing/editing comments. This field is for automatic or manual data entry.
    fldBuffFt = Field('NH_BUFF_FT', 'DOUBLE', '')  # Buffer width in feet. This field is for manual data entry, used to override buffer width values that would otherwise be calculated.
    fldConSite = Field('NH_CONSITE', 'SHORT', '')  # Field to indicate if segment relevant to ConSite delineation (1 = close enough to features to be relevant; 0 = not relevant)
-   fldIgnore = Field('NH_IGNORE', 'SHORT', '')  # Field to indicate if segment should be ignored for ConSite delineation (1 = Ignore, 0 = Use)
+   fldIgnore = Field('NH_IGNORE', 'SHORT', '')  # Field to indicate if segment should be ignored for ConSite delineation. See domain settings below.
    addFields = [fldBuffM, fldFlag, fldComments, fldBuffFt, fldConSite, fldIgnore]
 
    # Add the fields
@@ -476,17 +429,20 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    domName = "NH_IGNORE"
    try:
       arcpy.CreateDomain_management(os.path.dirname(outRCL), domName, "Ignore for ConSite delineation?", "SHORT", "CODED")
-      domDict = {0: "Use", 1: "Ignore"}
+      domDict = {0: "Use", 1: "Ignore - manual edit", 2: "Ignore - based on road class or segment type"}
       for code in domDict:
          arcpy.AddCodedValueToDomain_management(os.path.dirname(outRCL), domName, code, domDict[code])
-      arcpy.AssignDomainToField_management(outRCL, "NH_IGNORE", domName)
+      print("NH_IGNORE domain added.")
    except:
       print("NH_IGNORE domain already exists.")
-   printMsg("Updating NH_IGNORE...")
+   arcpy.AssignDomainToField_management(outRCL, "NH_IGNORE", domName)
+
+   # Calculate NH_IGNORE
+   printMsg("Updating NH_IGNORE based on MTFCC and SEGMENT_TYPE...")
    where_clause = "MTFCC IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') OR SEGMENT_TYPE IN (2, 10, 50)"
    lyr = arcpy.MakeFeatureLayer_management(outRCL)
    arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where_clause)
-   arcpy.CalculateField_management(lyr, 'NH_IGNORE', "1")
+   arcpy.CalculateField_management(lyr, 'NH_IGNORE', "2")
    del lyr
 
    # Calculate flag field
@@ -513,6 +469,8 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
 
 def AssignBuffer_su(inRCL):
    """Assign road surface buffer width based on other attribute fields.
+   - inRCL = prepped road centerlines feature class
+
    The codeblock used to assign buffer widths is based on information here:
    https://nacto.org/docs/usdg/geometric_design_highways_and_streets_aashto.pdf. 
    See the various tables (labeled "Exhibit x-x) showing the minimum width of traveled
@@ -666,10 +624,17 @@ def AssignBuffer_su(inRCL):
 
 def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
    """Generates road surfaces from road centerlines.
-   
-   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   - inRCL = prepped road centerlines feature class
+   - outSurfaces = output road surfaces feature class
+   - oldSurfacesService = (optional) Existing road surfaces feature service URL. See notes.
 
-   # This reduces to only key fields, which will make resulting dataset smaller
+   If the existing road surface feature service datasets URL is provided using oldSurfacesService, a process will run to
+   edit attributes and geometry of segments in the new surfaces feature class, which were manually edited
+   [NH_IGNORE IN (0, 1)] in the current road surfaces service. It's recommended to check that these segments were
+   updated correctly. The current feature road surfaces service is not altered in this process.
+
+   This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell"""
+   printMsg('Removing unnecessary fields...')
    allFlds = [a.name for a in arcpy.ListFields(inRCL)]
    keepFlds = ['OBJECTID', 'Shape', 'RCL_ID', 'LOCAL_ID', 'MFIPS', 'STREET_NAME_FULL', 'MTFCC', 'LOCAL_SPEED_MPH',
                 'SEGMENT_TYPE', 'SEGMENT_EXISTS', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR', 'VDOT_RTE_TYPE_CD']
@@ -678,7 +643,6 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
    for f in allFlds:
       if f in dropFlds:
          fieldinfo.addField(f, f, "HIDDEN", "")
-   # f2 = [fieldinfo.addField(f, f, "HIDDEN", "") for f in allFlds if f in dropFlds]
    lyr = arcpy.MakeFeatureLayer_management(inRCL, field_info=fieldinfo)
 
    printMsg('Buffering to create road surfaces. This could take awhile...')
@@ -688,15 +652,15 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
       arcpy.Buffer_analysis(lyr, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
       # NOTE: Pairwise buffer doesn't have the line_end option, so cannot do flat ends. Not using.
       # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
-   printMsg('Running repair...')
-   arcpy.RepairGeometry_management(outSurfaces)
-   printMsg('Mission accomplished.')
-   # Add domains back to road surfaces
-   copyDomains(outSurfaces, inRCL)
-
    if oldSurfacesService is not None:
       print("Updating NH_IGNORE of new surfaces using existing service...")
       UpdateRoadSurfaces_su(outSurfaces, oldSurfacesService)
+   printMsg('Mission accomplished.')
+
+   printMsg('Running repair...')
+   arcpy.RepairGeometry_management(outSurfaces)
+   # Add domains back to road surfaces
+   copyDomains(outSurfaces, inRCL)
 
    return outSurfaces
 
@@ -707,13 +671,16 @@ def UpdateRoadSurfaces_su(inSurfaces, oldSurfacesService):
    :param inSurfaces: New road surfaces feature class
    :param oldSurfacesService: Existing road surface feature service URL
    :return: inSurfaces
+
+   This is (optionally) used internally in CreateRoadSurfaces_su, but can also be used as a standalone function.
    """
    # Make feature layers from both datasets
    lyr_new = arcpy.MakeFeatureLayer_management(inSurfaces)
    lyr_old = arcpy.MakeFeatureLayer_management(oldSurfacesService)
    comm = "'Original segment automatically updated using existing NH_IGNORE data'"
 
-   print('Finding NH_IGNORE = 0 segments...')  # when a segment was originally ignored, but then manually overruled
+   print('Finding NH_IGNORE = 0 segments...')
+   # these are segments set to ignore because of their attributes, but were later manually overruled.
    arcpy.SelectLayerByAttribute_management(lyr_old, "NEW_SELECTION", where_clause="NH_IGNORE = 0")
    if arcpy.GetCount_management(lyr_old)[0] != '0':
       arcpy.SelectLayerByLocation_management(lyr_new, "ARE_IDENTICAL_TO", lyr_old)
@@ -728,6 +695,7 @@ def UpdateRoadSurfaces_su(inSurfaces, oldSurfacesService):
    del lyr_old
 
    print('Finding NH_IGNORE = 1 segments...')
+   # NH_IGNORE = 1 are segments manually set to ignore; NH_IGNORE = 2 were automatically set and not considered here.
    arcpy.Select_analysis(oldSurfacesService, 'tmp_ig0', where_clause="NH_IGNORE = 1")
    arcpy.SelectLayerByLocation_management(lyr_new, "CONTAINS", 'tmp_ig0')
    arcpy.SelectLayerByAttribute_management(lyr_new, "REMOVE_FROM_SELECTION", "NH_IGNORE = 1")
@@ -892,7 +860,8 @@ def main():
 
    ### Travel Time processing with Tiger only
    # set project folder name and create project geodatabase
-   project = r'F:\David\projects\RCL_processing\Tiger_2020'
+   # project = r'F:\David\projects\RCL_processing\Tiger_2020'
+   project = r'D:\projects\RCL\Travel_time\Tiger_XXXX'
    wd = project + os.sep + 'roads_proc.gdb'
    if not arcpy.Exists(wd):
       arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
@@ -937,8 +906,7 @@ def main():
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces, oldSurfacesService=serviceURL)
    # Headsup: using the oldSurfacesService option, a process will run to update NH_IGNORE to reflect changes made in the
-   #  current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need manual checks; see the NH_COMMENT field
-   #  to identify updated segments.
+   #  current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need to manually check these segments.
 
    ### End Road surfaces processing
 
