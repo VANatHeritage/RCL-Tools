@@ -5,7 +5,8 @@
 # Creation Date: 2021-04
 
 # Pre-requisite:
-# download OSM data from Geofabrik here: http://download.geofabrik.de/north-america/us.html.
+# download OSM data from Geofabrik here: http://download.geofabrik.de/north-america/us.html. Create a datestamped
+# folder, and extract archives into individual folders within there.
 
 # Summary:
 # A collection of functions for processing OSM roads data to prepare them as a Network Dataset. Processes include:
@@ -31,7 +32,7 @@ def mergeTiles(projName):
    :param projName: Name for output merged GDB and dataset
    :return: feature class
    """
-   # tileGDB = r'L:\David\GIS_data\OSM\osmdata.tileGDB'
+   # tileGDB = r'F:\David\GIS_data\OSM\osmdata.tileGDB'
    # projName = 'VA_50mile'
 
    dt = time.strftime('%Y%m%d')
@@ -88,10 +89,11 @@ def prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads):
    print('Creating merged feature class...')
    arcpy.FeatureClassToFeatureClass_conversion(inFC, wd, os.path.basename(outRoads))
    for i in appendFC:
-      print(i)
-      arcpy.Clip_analysis(i, boundary, wd + os.sep + 'rd2')
+      print('Appending ' + i + '...')
+      arcpy.PairwiseClip_analysis(i, boundary, wd + os.sep + 'rd2')
       arcpy.Append_management(wd + os.sep + 'rd2', outRoads, "NO_TEST")
    # delete identical by osm_id (border roads are included in both state datasets)
+   print('Removing identical road segments...')
    arcpy.GetCount_management(outRoads)
    arcpy.DeleteIdentical_management(outRoads, ['osm_id'])
 
@@ -111,6 +113,7 @@ def prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads):
 
    # clean up
    arcpy.Delete_management([wd + os.sep + 'rd2'])
+   print('Done.')
    return outRoads
 
 
@@ -282,33 +285,37 @@ def main():
    dt = time.strftime('%Y%m%d')
 
    # Make processing GDB
-   outGDB = r'E:\projects\OSM\OSM_RoadsProc.gdb'
+   outGDB = r'D:\projects\OSM\OSM_RoadsProc.gdb'
    if not arcpy.Exists(outGDB):
       arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
    arcpy.env.workspace = outGDB
 
-   ### BEGIN Network Dataset prep
-   netGDB = r'E:\projects\OSM\network\OSM_RoadsNet_Albers.gdb'
-   if not arcpy.Exists(netGDB):
-      arcpy.CreateFileGDB_management(os.path.dirname(netGDB), os.path.basename(netGDB))
+   # Inputs
+   OSMDir = r'D:\projects\OSM\geofabrik\20220627'
+   # Update below as needed using Tiger Urban areas.
+   urbanAreas = r'D:\projects\RCL\RCL_processing\RCL_processing.gdb\metro_areas'
+   boundary = r'D:\projects\RCL\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
+   inSnap = r"D:\projects\RCL\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"
 
-   urbanAreas = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'
-   boundary = r'L:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
+   # Set coordinate system
    arcpy.env.outputCoordinateSystem = boundary
-   inSnap = r"L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"
 
    # Get list of Geofabrik shapefiles
    nm = 'gis_osm_roads_free_1.shp'
-   inFC = r'E:\projects\OSM\geofabrik\virginia-latest-free.shp' + os.sep + nm
-   dirs = [d for d in os.listdir('geofabrik') if os.path.isdir(os.path.join('geofabrik', d)) and not d.startswith('virginia')]
-   appendFC = [os.path.join(os.getcwd(), 'geofabrik', a, nm) for a in dirs]
+   inFC = os.path.join(OSMDir, 'virginia-latest-free.shp', nm)
+   dirs = [d for d in os.listdir(OSMDir) if os.path.isdir(os.path.join(OSMDir, d)) and not d.startswith('virginia')]
+   appendFC = [os.path.join(OSMDir, a, nm) for a in dirs]
    # Merged feature class to create
    outRoads = outGDB + os.sep + 'OSM_Roads_' + dt
 
    # Create merged dataset with UA, speed and travel time attributes
    prepOSM(inFC, appendFC, boundary, urbanAreas, outRoads)
    attributeOSM(outRoads)
-   # Make a network GDB, dataset
+
+   # To make a network GDB, dataset
+   netGDB = r'D:\projects\OSM\network\OSM_RoadsNet_Albers_' + dt + '.gdb'
+   if not arcpy.Exists(netGDB):
+      arcpy.CreateFileGDB_management(os.path.dirname(netGDB), os.path.basename(netGDB))
    makeNetworkDataset(outRoads, netGDB)
 
    ### END Network Dataset prep

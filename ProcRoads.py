@@ -18,7 +18,7 @@
 # - MakeNetworkDataset_tt (to create a new network dataset for travel time analyses, from merged roads dataset)
 # 
 # Use the following function sequence to generate road surfaces from road centerlines:
-# - PrepRoadsVA_su (to add necessary fields to roads data)
+# - PrepRoadsVA_su (to add necessary fields to roads data and attribute NH_IGNORE for certain road class/segment types)
 # - AssignBuffer_su (to assign road surface buffer widths)
 # - CreateRoadSurfaces_su (to generate road surfaces based on the specified buffer widths)
 
@@ -274,7 +274,7 @@ def RampPts(roads, rampPts, highway="MTFCC = 'S1100'", ramp="MTFCC = 'S1630'", l
    This functions generates 'ramp points' for use as junctions in a network dataset. It generates
    points at all ramp segment endpoints which intersect a limited access highway or local road.
 
-   This function was develope for use with Tiger/Line roads.
+   This function was developed for use with Tiger/Line roads.
 
    Used as an internal fn in MakeNetworkDataset_tt.
    """
@@ -429,7 +429,7 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    domName = "NH_IGNORE"
    try:
       arcpy.CreateDomain_management(os.path.dirname(outRCL), domName, "Ignore for ConSite delineation?", "SHORT", "CODED")
-      domDict = {0: "Use", 1: "Ignore - manual edit", 2: "Ignore - based on road class or segment type"}
+      domDict = {0: "Use", 1: "Ignore: manual edit", 2: "Ignore: excluded road class or segment type"}
       for code in domDict:
          arcpy.AddCodedValueToDomain_management(os.path.dirname(outRCL), domName, code, domDict[code])
       print("NH_IGNORE domain added.")
@@ -622,7 +622,7 @@ def AssignBuffer_su(inRCL):
    return inRCL
 
 
-def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
+def CreateRoadSurfaces_su(inRCL, outSurfaces, oldService=None):
    """Generates road surfaces from road centerlines.
    - inRCL = prepped road centerlines feature class
    - outSurfaces = output road surfaces feature class
@@ -652,9 +652,9 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
       arcpy.Buffer_analysis(lyr, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
       # NOTE: Pairwise buffer doesn't have the line_end option, so cannot do flat ends. Not using.
       # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
-   if oldSurfacesService is not None:
+   if oldService is not None:
       print("Updating NH_IGNORE of new surfaces using existing service...")
-      UpdateRoadSurfaces_su(outSurfaces, oldSurfacesService)
+      UpdateIgnore_su(outSurfaces, oldService)
    printMsg('Mission accomplished.')
 
    printMsg('Running repair...')
@@ -665,18 +665,18 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldSurfacesService=None):
    return outSurfaces
 
 
-def UpdateRoadSurfaces_su(inSurfaces, oldSurfacesService):
+def UpdateIgnore_su(inSurfaces, oldService):
    """
-   Updates a new road surface layer, using edits from the existing service layer.
+   Updates a new road surface layer 'ignore' status (NH_IGNORE), using segments from the existing service layer.
    :param inSurfaces: New road surfaces feature class
-   :param oldSurfacesService: Existing road surface feature service URL
+   :param oldService: Existing road surface feature service URL
    :return: inSurfaces
 
    This is (optionally) used internally in CreateRoadSurfaces_su, but can also be used as a standalone function.
    """
    # Make feature layers from both datasets
    lyr_new = arcpy.MakeFeatureLayer_management(inSurfaces)
-   lyr_old = arcpy.MakeFeatureLayer_management(oldSurfacesService)
+   lyr_old = arcpy.MakeFeatureLayer_management(oldService)
    comm = "'Original segment automatically updated using existing NH_IGNORE data'"
 
    print('Finding NH_IGNORE = 0 segments...')
@@ -696,7 +696,7 @@ def UpdateRoadSurfaces_su(inSurfaces, oldSurfacesService):
 
    print('Finding NH_IGNORE = 1 segments...')
    # NH_IGNORE = 1 are segments manually set to ignore; NH_IGNORE = 2 were automatically set and not considered here.
-   arcpy.Select_analysis(oldSurfacesService, 'tmp_ig0', where_clause="NH_IGNORE = 1")
+   arcpy.Select_analysis(oldService, 'tmp_ig0', where_clause="NH_IGNORE = 1")
    arcpy.SelectLayerByLocation_management(lyr_new, "CONTAINS", 'tmp_ig0')
    arcpy.SelectLayerByAttribute_management(lyr_new, "REMOVE_FROM_SELECTION", "NH_IGNORE = 1")
    if arcpy.GetCount_management(lyr_new)[0] == '0':
@@ -860,20 +860,19 @@ def main():
 
    ### Travel Time processing with Tiger only
    # set project folder name and create project geodatabase
-   # project = r'F:\David\projects\RCL_processing\Tiger_2020'
    project = r'D:\projects\RCL\Travel_time\Tiger_XXXX'
-   wd = project + os.sep + 'roads_proc.gdb'
-   if not arcpy.Exists(wd):
-      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
-   arcpy.env.workspace = wd
-   arcpy.env.outputCoordinateSystem = r'F:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
+   out_gdb = project + os.sep + 'roads_proc.gdb'
+   if not arcpy.Exists(out_gdb):
+      arcpy.CreateFileGDB_management(os.path.dirname(out_gdb), os.path.basename(out_gdb))
+   arcpy.env.workspace = out_gdb
+   arcpy.env.outputCoordinateSystem = r'D:\projects\RCL\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84'
 
    # Process Tiger roads for travel time
    inDir = project + '/data/unzip'
-   outRoads = wd + os.sep + 'all_centerline'
+   outRoads = out_gdb + os.sep + 'all_centerline'
    outSubsetTiger = 'all_subset'
    # Urban areas are used to reduce speeds on >30mph roads by 10 mph. Fixed to 2018 dataset
-   urbAreas = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\metro_areas'
+   urbAreas = r'D:\projects\RCL\Travel_time\Tiger_2018\roads_proc.gdb\metro_areas'
    PrepRoadsTIGER_tt(inDir, outRoads, outSubsetTiger, inBnd=None, urbAreas=urbAreas)
 
    # Create a travel time Network Dataset
@@ -887,37 +886,39 @@ def main():
 
    ### Road Surfaces processing
    project = r'D:\projects\RCL\Road_surfaces'
-   wd = project + os.sep + 'RCL_surfaces_2022Q1.gdb'
-   if not arcpy.Exists(wd):
-      arcpy.CreateFileGDB_management(os.path.dirname(wd), os.path.basename(wd))
-   arcpy.env.workspace = wd
+   out_gdb = project + os.sep + 'RCL_surfaces_2022Q1.gdb'
+   if not arcpy.Exists(out_gdb):
+      arcpy.CreateFileGDB_management(os.path.dirname(out_gdb), os.path.basename(out_gdb))
+   arcpy.env.workspace = out_gdb
    arcpy.env.overwriteOutput = True
 
    # Set up your variables here
    orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2022Q1.gdb'
    inRCL = orig_gdb + os.sep + 'VA_CENTERLINE'
    inVDOT = orig_gdb + os.sep + 'VDOT_ATTRIBUTE'
-   outRCL = wd + os.sep + 'RCL_forRoadSurfaces'
-   outSurfaces = wd + os.sep + 'VirginiaRoadSurfaces'
+   outRCL = out_gdb + os.sep + 'RCL_forRoadSurfaces'
+   outSurfaces = out_gdb + os.sep + 'VirginiaRoadSurfaces'
    serviceURL = r'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/VirginiaRoadSurfaces/FeatureServer/6'
 
    # Run road surfaces workflow
    PrepRoadsVA_su(inRCL, inVDOT, outRCL)
    AssignBuffer_su(outRCL)
-   CreateRoadSurfaces_su(outRCL, outSurfaces, oldSurfacesService=serviceURL)
+   CreateRoadSurfaces_su(outRCL, outSurfaces, oldService=serviceURL)
    # Headsup: using the oldSurfacesService option, a process will run to update NH_IGNORE to reflect changes made in the
    #  current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need to manually check these segments.
 
    ### End Road surfaces processing
 
 
-   ### Road Density processing
-   arcpy.env.workspace = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb'
+   ### Road Density processing (using roads already processed for travel time)
+   project = r'D:\projects\RCL\Travel_time\Tiger_XXXX'
+   out_gdb = project + os.sep + 'roads_proc.gdb'
+   arcpy.env.workspace = out_gdb
    inRoads = "all_centerline_urbAdjust"  # r'F:\Working\RecMod\roads_proc_TIGER2018.gdb\all_centerline'
    selType = "NO_HIGHWAY"
    outRoads = "roads_filtered"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_filtered'
-   inSnap = r"F:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"  # r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
-   inMask = r"F:\David\projects\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84"  # r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
+   inSnap = r"D:\projects\RCL\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84"  # r'F:\Working\Snap_AlbersCONUS30\Snap_AlbersCONUS30.tif'
+   inMask = r"D:\projects\RCL\RCL_processing\RCL_processing.gdb\VA_Buff50mi_wgs84"  # r'F:\Working\VA_Buff50mi\VA_Buff50mi.shp'
    outRoadDens = "Roads_kdens_250"  # r'F:\Working\RecMod\RecModProducts.gdb\Roads_kdens_250'
 
    FilterRoads_dens(inRoads, selType, outRoads)

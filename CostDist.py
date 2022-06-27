@@ -69,13 +69,13 @@ This function was adapted from ModelBuilder tools created by Kirsten R. Hazler a
 def main():
 
    # set project folder and create new cost surfaces GDB
-   project = r'L:\David\projects\RCL_processing\Tiger_2020'
+   project = r'D:\projects\RCL\Travel_time\Tiger_2020'
    outGDB = project + os.sep + 'cost_surfaces.gdb'
    if not arcpy.Exists(outGDB):
       arcpy.CreateFileGDB_management(os.path.dirname(outGDB), os.path.basename(outGDB))
 
    # template raster
-   snpRast = r'L:\David\projects\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84'
+   snpRast = r'D:\projects\RCL\RCL_processing\RCL_processing.gdb\SnapRaster_albers_wgs84'
    arcpy.env.extent = snpRast
    arcpy.env.snapRaster = snpRast
    arcpy.env.cellSize = snpRast

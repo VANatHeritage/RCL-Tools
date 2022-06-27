@@ -155,19 +155,20 @@ def BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre='', suf='', 
 # Use the main function below to run a function directly from Python IDE or command line with hard-coded variables
 
 def main():
+   # NOTE: census seems to have moved online repository to www2.census.gov, which does not work with this (ftplib) tool
+
    # Set up variables 
    # The following are for TIGER/Line roads data
-   in_tab = r'L:\David\projects\RCL_processing\counties_50mile_VAwatershed.txt'
+   in_tab = r'D:\projects\RCL\RCL_processing\counties_50mile_VAwatershed.txt'
    in_fld = 'GEOID'  # (5-digit code for state/county)
-   out_dir = r'L:\David\projects\RCL_processing\Tiger_2020\data'
+   out_dir = r'D:\projects\RCL\Travel_time\Tiger_2020\data'
    ftpHOST = 'ftp2.census.gov'
    ftpDIR = 'geo/tiger/TIGER2020/ROADS'
    pre = 'tl_2020_'
    suf = '_roads.zip'
-   extract = True
 
    # Specify function to run
-   BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre, suf, extract)
+   BatchDownloadZips(in_tab, in_fld, out_dir, ftpHOST, ftpDIR, pre, suf, extract=True)
 
 
 if __name__ == '__main__':
