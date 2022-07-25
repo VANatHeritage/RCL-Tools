@@ -20,55 +20,80 @@
 
 # ---------------------------------------------------------------------------
 
-import arcpy
-import time
-import os
+from Helper import *
 from ProcRoads import CalcRoadDensity
-arcpy.env.overwriteOutput = True
 
 
-def mergeTiles(projName):
+def mergeTiles(tileGDB, outFolder, projName, boundary=None, deleteTiles=False):
    """
-   :param projName: Name for output merged GDB and dataset
+   This function merges tiles downloaded from osmdata using R, which is an alternative to downloaded data from
+   Geofabrik. The advantage of this is it allows for custom extent and attribute selection, which are not included in
+   Geofabrik (e.g. lane count, bridge, tunnel, etc).
+
+   :param tileGDB: Input geodatabase containing downloaded tiles
+   :param outFolder: Output folder
+   :param projName: Project name. Will search for osm_line datasets with this prefix in the tileGDB.
+   :param boundary: optional output boundary. Features not intersecting the boundary will not be included.
+   :param deleteTiles: Delete tiles once merging is finished?
    :return: feature class
-   """
-   # tileGDB = r'F:\David\GIS_data\OSM\osmdata.tileGDB'
-   # projName = 'VA_50mile'
 
-   dt = time.strftime('%Y%m%d')
+   ###
 
-   # get project FCs
-   ls = arcpy.ListFeatureClasses(projName + '_osm_line_*')
-   bound = arcpy.ListFeatureClasses(projName + '_features_*')[0]
-   # grid = arcpy.ListFeatureClasses(projName + '_grid_*')[0]
-
-   # set environments
-   arcpy.env.extent = bound
-   arcpy.env.outputCoordinateSystem = bound
+   Example usage:
+   boundary = r'D:\projects\GIS_Data\Reference_Data.gdb\VirginiaCounty'
+   arcpy.env.overwriteOutput = True
+   arcpy.env.outputCoordinateSystem = refbnd
    arcpy.env.overwriteOutput = True
 
+   tileGDB = r'D:\projects\OSM\osmdata_download\osmdata.gdb'
+   outFolder = r'D:\projects\OSM\osmdata_download'
+   projName = 'VA_boundary'
+   mergeTiles(tileGDB, outFolder, projName, boundary, deleteTiles=False)
+   """
+   # dt = time.strftime('%Y%m%d')
+   # get project FCs
+   with arcpy.EnvManager(workspace=tileGDB):
+      ls = [tileGDB + os.sep + a for a in arcpy.ListFeatureClasses(projName + '_osm_line_*')]
+      bound = [tileGDB + os.sep + a for a in arcpy.ListFeatureClasses(projName + '_features_*')]
+      # grid = arcpy.ListFeatureClasses(projName + '_grid_*')[0]
+
+   # Get date from bounding feature
+   dt = max(bound)[-8:]
+
+   # Use first file with most fields as the template
+   fld_len = [len(getFlds(a)) for a in ls]
+   template = ls[fld_len.index(max(fld_len))]
+
    # make new tileGDB with timestamp
-   proj_gdb = os.getcwd() + os.sep + projName + '_' + dt + '.tileGDB'
-   if not arcpy.Exists(proj_gdb):
-      print('Creating geodatabase `' + proj_gdb + '`...')
-      arcpy.CreateFileGDB_management(os.path.dirname(proj_gdb), os.path.basename(proj_gdb))
+   proj_gdb = outFolder + os.sep + projName + '_' + dt + '.gdb'
+   createFGDB(proj_gdb)
 
    # initiate new feature class
    out = proj_gdb + os.sep + projName + '_osm_line'
-   arcpy.CopyFeatures_management(ls[0], out)
+   lyr = arcpy.MakeFeatureLayer_management(template)
+   if boundary:
+      arcpy.SelectLayerByLocation_management(lyr, "INTERSECT", boundary)
+   arcpy.CopyFeatures_management(lyr, out)
 
    # coulddo: use merge? Might cause issues with memory/processing
-   ls2 = ls[1:]
+   ls.remove(template)
    print('Appending tiles to output dataset...')
-   for i in ls2:
-      print(i)
-      arcpy.Append_management(i, out, "NO_TEST")
+   for i in ls:
+      lyr = arcpy.MakeFeatureLayer_management(i)
+      if boundary:
+         arcpy.SelectLayerByLocation_management(lyr, "INTERSECT", boundary)
+      print('Appending ' + i + '...')
+      arcpy.Append_management(lyr, out, "NO_TEST")
 
    # Clean up final dataset
    print('Deleting identical road segments...')
    arcpy.AddSpatialIndex_management(out)
-   arcpy.DeleteIdentical_management(out, ['Shape'])  # Can take 15-30 minutes. # osm_id?
+   arcpy.DeleteIdentical_management(out, ['osm_id'])  # Use osm_id, much faster than Shape.
    arcpy.Compact_management(proj_gdb)
+
+   if deleteTiles:
+      print("Deleting original tiles...")
+      garbagePickup(ls)
 
    return out
 
