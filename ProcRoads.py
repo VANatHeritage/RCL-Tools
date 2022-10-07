@@ -399,7 +399,7 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    # NOTE: below was abandoned because NULLs were replaced with default values (usually 0) in these approaches.
    # CopyFeatsFC(inRCL, outRCL, keepFlds=keepFlds)
 
-   # below uses CopyFeatures_management, which does not change NULLs to default values, but it doesn't copy domains.
+   # below uses CopyFeatures_management, which does not change NULLs to default values, but it doesn't copy domains. So domains are re-added after the process.
    CopyFeats(inRCL, outRCL, keepFlds=keepFlds)
    copyDomains(outRCL, inRCL)
 
@@ -408,9 +408,8 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    arcpy.TableToTable_conversion(inVDOT, os.path.dirname(copyVDOT), os.path.basename(copyVDOT))
 
    # Join fields from VDOT table
-   printMsg('Joining attributes from VDOT table, could take a while...')
-   # vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_LANE_COUNT_NBR', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
-   JoinFast(outRCL, 'VDOT_EDGE_ID', copyVDOT, 'VDOT_EDGE_ID')  # , vdotFields)
+   vdotFields = ['VDOT_RTE_TYPE_CD', 'VDOT_LANE_COUNT_NBR', 'VDOT_SURFACE_WIDTH_MSR', 'VDOT_TRAFFIC_AADT_NBR']
+   JoinFast(outRCL, 'VDOT_EDGE_ID', copyVDOT, 'VDOT_EDGE_ID', vdotFields)
 
    # Define a class to store field information
    class Field:
@@ -439,7 +438,7 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
    domName = "NH_IGNORE"
    try:
       arcpy.CreateDomain_management(os.path.dirname(outRCL), domName, "Ignore for ConSite delineation?", "SHORT", "CODED")
-      domDict = {0: "Use", 1: "Ignore: manual edit", 2: "Ignore: excluded road class or segment type"}
+      domDict = {0: "0. Use", 1: "1. Ignore: manual edit", 2: "2. Ignore: excluded road class or segment type"}
       for code in domDict:
          arcpy.AddCodedValueToDomain_management(os.path.dirname(outRCL), domName, code, domDict[code])
       print("NH_IGNORE domain added.")
@@ -657,8 +656,7 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldService=None):
       # default tolerance is 0.001 meters. Larger tolerances will result in more generalized buffers (fewer vertices),
       # which results in a smaller dataset, limiting the feature service size.
       arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
-      # headsup: Pairwise buffer doesn't have the line_end option, so cannot do flat ends. If it adds that option,
-      #  should start using it.
+      # headsup: Pairwise buffer doesn't have the line_end option, so cannot do flat ends. If it adds that option, should start using it.
       # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
    printMsg('Running repair...')
    arcpy.RepairGeometry_management(outSurfaces)
@@ -903,46 +901,26 @@ def main():
 
 
    ### Road Surfaces processing
-   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2022Q2.gdb'
+   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2022Q3.gdb'
    project = r'D:\projects\RCL\Road_surfaces'
-   out_gdb = project + os.sep + 'RCL_surfaces_2022Q2.gdb'
+   out_gdb = project + os.sep + 'RCL_surfaces_2022Q3.gdb'
    createFGDB(out_gdb)
    arcpy.env.workspace = out_gdb
    arcpy.env.overwriteOutput = True
 
-   '''
-   IMPORTANT NOTE about VGIN RCL dataset, re: VDOT_ATTRIBUTE in 2022q2 missing data for many segments.
-   
-   As of 2022q2, VDOT_ATTRIBUTE was missing many rows that were previously in the dataset. After contacting
-   VGIN/VDOT, it's unclear whether this table will be maintained in the future:
-   
-   Elliot Jordan (VDOT) responded about this: The RCL dataset is from VGIN and is driven by mapping for 911 purposes.  
-   This is the most current dataset for current roads and addresses. In the past VGIN and VDOT would exchange data 
-   and VGIN would populate data from VDOT in the VDOT attributes table and in the "VDOT_" fields in the centerlines. 
-   This has not been happening with any regularity recently resulting in the issue that you raise.
-
-   Recommendation from VDOT (Wenling Chen), when I asked about a surface width attribute: In terms of lane count to
-   paved surface, I would use 14 feet on the interstates, 12 feet on primaries and 10 feet on Secondaries.
-   
-   DB Note: For road surfaces, we use the surface width and traffic counts attributes to help estimate surface width.
-   There doesn't appear to be a direct replacement of this data from VDOT which can be easily joined to VGIN
-   centerlines. Workaround for 2022q2 was to use the previous quarter's VDOT_ATTRIBUTE table (2022q1). 
-   Check future releases to see if fixed; if not, may need another solution (e.g. Wenling's suggestion, OSM data?).
-   '''
    # Set up your variables here
    inRCL = orig_gdb + os.sep + 'VA_CENTERLINE'
-   # inVDOT = orig_gdb + os.sep + 'VDOT_ATTRIBUTE'  # SEE NOTE ABOVE
-   inVDOT = r'D:\projects\RCL\Road_surfaces\RCL_surfaces_2022Q1.gdb\VDOT_ATTRIBUTE'
+   inVDOT = orig_gdb + os.sep + 'VDOT_ATTRIBUTE'
    outRCL = out_gdb + os.sep + 'RCL_forRoadSurfaces'
    outSurfaces = out_gdb + os.sep + 'VirginiaRoadSurfaces'
-   serviceURL = r'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/VirginiaRoadSurfaces/FeatureServer/6'
+   serviceURL = r'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/VirginiaRoadSurfaces/FeatureServer/0'
 
    # Run road surfaces workflow
    PrepRoadsVA_su(inRCL, inVDOT, outRCL)
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces, oldService=serviceURL)
-   # Headsup: using the oldSurfacesService option, a process will run to update NH_IGNORE to reflect changes made in the
-   #  current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need to manually check these segments.
+   # Headsup: using the oldSurfacesService option, a process will run to update NH_IGNORE to reflect manual edits made
+   #  in the current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need to manually check these segments.
 
    ### End Road surfaces processing
 
