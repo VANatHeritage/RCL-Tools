@@ -10,6 +10,7 @@
 
 # Usage tips:
 # See https://www2.census.gov/geo/pdfs/reference/mtfccs2018.pdf for current road codes in TIGER data
+# VGIN Road Centerlines (updated quarterly): https://vgin.vdem.virginia.gov/datasets/virginia-road-centerlines-rcl/about
 
 # Use the following function sequence to prepare roads for travel time analysis:
 # - PrepRoadsVA_tt (to prepare Virginia RCL data for travel time analysis)
@@ -448,7 +449,7 @@ def PrepRoadsVA_su(inRCL, inVDOT, outRCL):
 
    # Calculate NH_IGNORE
    printMsg("Updating NH_IGNORE based on MTFCC and SEGMENT_TYPE...")
-   where_clause = "MTFCC IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') OR SEGMENT_TYPE IN (2, 10, 50)"
+   where_clause = "MTFCC IN ('S1730', 'S1780', 'S9999', 'S1710', 'S1720', 'S1740', 'S1820', 'S1830', 'S1500') OR SEGMENT_TYPE IN (2, 10, 50)"  # OR SEGMENT_EXISTS = 'N'
    lyr = arcpy.MakeFeatureLayer_management(outRCL)
    arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where_clause)
    arcpy.CalculateField_management(lyr, 'NH_IGNORE', "2")
@@ -644,7 +645,7 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldService=None):
    If the existing road surface feature service datasets URL is provided using oldSurfacesService, UpdateIgnore_su
    will run to edit attributes and geometry of segments in inRCL which fall within manually edited
    surface polygons in the current road surfaces service [NH_IGNORE IN (0, 1)]. It's recommended to check that these
-   segments were updated correctly. The current feature road surfaces service is not altered in this process.
+   segments were updated correctly. The feature service is not altered in this process.
 
    This function was adapted from a ModelBuilder toolbox created by Kirsten R. Hazler and Peter Mitchell.
    """
@@ -653,12 +654,13 @@ def CreateRoadSurfaces_su(inRCL, outSurfaces, oldService=None):
       UpdateIgnore_su(inRCL, oldService)
    printMsg('Buffering to create road surfaces. This could take awhile...')
    with arcpy.EnvManager(XYTolerance="0.1 Meters"):
-      # default tolerance is 0.001 meters. Larger tolerances will result in more generalized buffers (fewer vertices),
-      # which results in a smaller dataset, limiting the feature service size.
+      # default tolerance is 0.001 meters. Setting a larger tolerance results in more generalized buffers (fewer vertices),
+      # which helps limit the feature class/service size.
       arcpy.Buffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "FULL", "FLAT", "NONE", "", "PLANAR")
-      # headsup: Pairwise buffer doesn't have the line_end option, so cannot do flat ends. If it adds that option, should start using it.
+      # headsup: Pairwise buffer doesn't have the line_end option, so it cannot do flat ends buffers. If it adds that option, should start using it, since it would be much faster.
       # arcpy.PairwiseBuffer_analysis(inRCL, outSurfaces, "NH_BUFF_M", "NONE")
    printMsg('Running repair...')
+   # Repair likely is unnecessary...
    arcpy.RepairGeometry_management(outSurfaces)
    # Add domains back to road surfaces
    copyDomains(outSurfaces, inRCL)
@@ -670,7 +672,7 @@ def UpdateIgnore_su(inRCL, oldService):
    """
    Updates the 'ignore' status (NH_IGNORE) of a new RCL lines layer prepped for road surfaces, using the manually-edited
    [NH_IGNORE IN (0, 1)] road surface segments from the existing service layer. Line segments within those polygons
-   will be updated to match the existing NH_IGNORE value.
+   will be updated to match the existing NH_IGNORE value. The feature service is not altered in this process.
    :param inRCL: New road centerlines (line feature class)
    :param oldService: Existing road surface feature service URL
    :return: inSurfaces
@@ -698,7 +700,7 @@ def UpdateIgnore_su(inRCL, oldService):
    # For use=0, only want to change segments if they are set to ignore.
    arcpy.SelectLayerByAttribute_management(lyr_new, "SUBSET_SELECTION", "NH_IGNORE IN (1, 2)")
    if arcpy.GetCount_management(lyr_new)[0] != '0':
-      print('Updating NH_IGNORE=0 segments...')
+      print('Updating NH_IGNORE = 0 segments...')
       arcpy.CopyFeatures_management(lyr_new, 'tmp_app0')
       arcpy.Identity_analysis('tmp_app0', nh0, 'tmp_app1', "ONLY_FID")
       lyr_app = arcpy.MakeFeatureLayer_management('tmp_app1')
@@ -901,9 +903,9 @@ def main():
 
 
    ### Road Surfaces processing
-   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2022Q3.gdb'
+   orig_gdb = r'F:\David\GIS_data\roads\Virginia_RCL_Dataset_2023Q3.gdb'
    project = r'D:\projects\RCL\Road_surfaces'
-   out_gdb = project + os.sep + 'RCL_surfaces_2022Q3.gdb'
+   out_gdb = project + os.sep + 'RCL_surfaces_2023Q3.gdb'
    createFGDB(out_gdb)
    arcpy.env.workspace = out_gdb
    arcpy.env.overwriteOutput = True
@@ -913,14 +915,14 @@ def main():
    inVDOT = orig_gdb + os.sep + 'VDOT_ATTRIBUTE'
    outRCL = out_gdb + os.sep + 'RCL_forRoadSurfaces'
    outSurfaces = out_gdb + os.sep + 'VirginiaRoadSurfaces'
-   serviceURL = r'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/VirginiaRoadSurfaces/FeatureServer/0'
+   serviceURL = r'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/VirginiaRoadSurfaces/FeatureServer/39'
 
    # Run road surfaces workflow
    PrepRoadsVA_su(inRCL, inVDOT, outRCL)
    AssignBuffer_su(outRCL)
    CreateRoadSurfaces_su(outRCL, outSurfaces, oldService=serviceURL)
    # Headsup: using the oldSurfacesService option, a process will run to update NH_IGNORE to reflect manual edits made
-   #  in the current road surfaces service (NH_IGNORE = 0 or NH_IGNORE = 1). May need to manually check these segments.
+   #  in the current road surfaces service (i.e., rows where NH_IGNORE = 0 or NH_IGNORE = 1). May want to manually review these segments following execution.
 
    ### End Road surfaces processing
 
